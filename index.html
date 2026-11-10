@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ff7aa8">
+<meta name="theme-color" content="#94d4a2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -15,27 +15,21 @@
 <style>
 /* Layout: one-screen mobile app — three tabs (지도 / 오늘 뭐 먹지 / 랜덤 런치밋) behind one floating pill bar */
 :root{
-  --sky:#cfe6ff; --sky2:#e9f4ff;
-  --ground:#f4f7fb; --block:#ffffff; --park:#c9efd3; --road:#ffffff; --roadEdge:#dce6f2;
-  --ink:#24324a; --ink2:#6a7a93; --line:#e3eaf3;
-  --card:#ffffffee; --cardSolid:#ffffff;
-  --accent:#3d7bff; --accentSoft:#e3edff;
-  --pink:#ff7aa8; --pinkSoft:#ffe4ee; --mint:#3cc47c; --mintSoft:#dcf6e8; --sun:#ffc531; --sunSoft:#fff3cf;
-  --shadow:0 10px 30px rgba(52,94,160,.18);
-  --route:#1fb85f; --routeDeep:#15904a; --routeSoft:#dbf7e6;
+  /* Layout: cozy island game map — grass field with dirt paths, trees & pond; cream paper UI with wooden signboards */
+  --grass:#dcebd8; --grassDeep:#c9e0c4; --tuft:#5fae72;
+  --sky:#b7e3c0; --sky2:#94d4a2; --ground:#94d4a2;
+  --block:#ffffff; --park:#c9efd3; --road:#ffffff; --roadEdge:#d9e8dc; --mapSky:#d6efd9; --mapGround:#f2f8f1;
+  --ink:#5b3d22; --ink2:#8b6d50; --line:#e7d5ad;
+  --card:#fffaf0f2; --cardSolid:#fffaf0; --paperEdge:#e6d2a4; --paperShadow:#d2b77d;
+  --wood:#b47a45; --woodDeep:#7f5129; --woodText:#fff6e2;
+  --accent:#3b9bd4; --accentSoft:#dcf0fb;
+  --pink:#f0768a; --pinkSoft:#ffe5e3; --mint:#5cb766; --mintSoft:#e0f4da; --sun:#f5c445; --sunSoft:#fff2c7;
+  --route:#4caf50; --routeDeep:#358a39; --routeSoft:#dcf3d6;
+  --shadow:0 5px 0 rgba(122,88,45,.22),0 10px 20px rgba(70,90,50,.18);
   --display:"Jua","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --sky:#1b2a44; --sky2:#14203a; --ground:#1d2940; --block:#26344f; --park:#24493a; --road:#33435f; --roadEdge:#2a3954;
-  --ink:#eef3ff; --ink2:#a5b3cc; --line:#34445f; --card:#22304aee; --cardSolid:#22304a;
-  --accent:#7aa5ff; --accentSoft:#2c3d63; --pink:#ff8fb7; --pinkSoft:#4a2c40; --mint:#5ad69a; --mintSoft:#1f4434; --sun:#ffd25c; --sunSoft:#4a3f1f;
-  --shadow:0 10px 30px rgba(0,0,0,.4); --route:#3ed683; --routeDeep:#24a85f; --routeSoft:#1c4532; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --sky:#1b2a44; --sky2:#14203a; --ground:#1d2940; --block:#26344f; --park:#24493a; --road:#33435f; --roadEdge:#2a3954;
-  --ink:#eef3ff; --ink2:#a5b3cc; --line:#34445f; --card:#22304aee; --cardSolid:#22304a;
-  --accent:#7aa5ff; --accentSoft:#2c3d63; --pink:#ff8fb7; --pinkSoft:#4a2c40; --mint:#5ad69a; --mintSoft:#1f4434; --sun:#ffd25c; --sunSoft:#4a3f1f;
-  --shadow:0 10px 30px rgba(0,0,0,.4); --route:#3ed683; --routeDeep:#24a85f; --routeSoft:#1c4532; color-scheme:dark}
 html,body{height:100%}
 body{background:var(--sky2);color:var(--ink);font-family:var(--body);overflow:hidden}
 *{box-sizing:border-box}
@@ -46,7 +40,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .app{position:relative;height:100%;max-width:460px;margin:0 auto;overflow:hidden;background:var(--ground);box-shadow:0 0 0 1px var(--line)}
 
 /* ===== map ===== */
-#map{position:absolute;inset:0;touch-action:none;cursor:grab;background:radial-gradient(1200px 600px at 50% -10%,var(--sky),transparent 60%),var(--ground)}
+#map{position:absolute;inset:0;touch-action:none;cursor:grab;background:radial-gradient(1200px 600px at 50% -10%,var(--mapSky),transparent 60%),var(--mapGround)}
 #map.drag{cursor:grabbing}
 #layer{position:absolute;left:0;top:0;transform-origin:0 0}
 #roads{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
@@ -245,6 +239,45 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .msg{font-size:12.5px;color:var(--ink2);line-height:1.5}
 .msg.err{color:var(--pink)}
 .notice{background:var(--sunSoft);border-radius:18px;padding:12px 14px;font-size:13px;line-height:1.55}
+/* ===== cozy game skin ===== */
+body{background:var(--grass)}
+.app{background:var(--mapGround);box-shadow:none}
+.roadname{fill:#7a8aa3;opacity:.8}
+.top{background:linear-gradient(var(--mapGround) 0,var(--mapGround) 70%,transparent)}
+.title{display:inline-block;background:var(--wood);color:var(--woodText);padding:7px 14px 6px;border-radius:14px;border:3px solid var(--woodDeep);box-shadow:0 4px 0 #5e3a1b;text-shadow:0 2px 0 rgba(0,0,0,.18);font-size:clamp(17px,5vw,22px);position:relative}
+.title::before,.title::after{content:"";position:absolute;top:50%;width:6px;height:6px;border-radius:50%;background:var(--woodDeep);transform:translateY(-50%)}
+.title::before{left:6px}.title::after{right:6px}
+.round,.search,.chip,.arrow,.counter{background:var(--cardSolid);border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow);backdrop-filter:none}
+.chip{color:var(--ink)}
+.chip[aria-pressed="true"]{border-color:rgba(0,0,0,.12);box-shadow:0 4px 0 rgba(0,0,0,.22)}
+.arrow:active,.chip:active,.round:active{transform:translateY(3px);box-shadow:0 1px 0 var(--paperShadow)}
+.bub{background:var(--cardSolid);border-width:3.5px;box-shadow:0 4px 0 rgba(0,0,0,.2),0 8px 12px rgba(40,70,40,.2)}
+.tag{background:var(--wood);color:var(--woodText);border:2px solid var(--woodDeep);border-radius:8px;box-shadow:0 2px 0 #5e3a1b;padding:2px 7px}
+.hq .label{background:var(--wood);color:var(--woodText);border:2.5px solid var(--woodDeep);border-radius:10px;box-shadow:0 3px 0 #5e3a1b}
+.hq .ring{background:radial-gradient(closest-side,rgba(255,250,200,.75),transparent)}
+.station{background:#3b8fd6;border:2.5px solid #2a6ca6;border-radius:10px;box-shadow:0 3px 0 #1f5585}
+.exitMark{background:#fffaf0;color:var(--ink);border:2px solid #b8a37a;box-shadow:0 2px 0 #9c8760;padding:1px 7px 1px 1px}
+.exitMark b{background:#5cb766;color:#fff}
+.exitMark.hq8{background:#fffaf0;border-color:var(--wood);box-shadow:0 2px 0 var(--woodDeep)}
+.exitMark.hq8 b{background:var(--pink);color:#fff}
+.hideTags .exitMark{font-size:0;gap:0;padding:1px}
+.hideTags .exitMark b{font-size:11px}
+.card.hint{background:var(--cardSolid);background-image:radial-gradient(rgba(214,190,140,.18) 1px,transparent 1.2px);background-size:12px 12px}
+.card{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow),0 12px 22px rgba(60,80,40,.18);border-radius:26px;background-image:radial-gradient(rgba(214,190,140,.18) 1px,transparent 1.2px);background-size:12px 12px}
+.card.on{border-color:var(--c);box-shadow:0 6px 0 color-mix(in srgb,var(--c) 70%,#000 10%),0 12px 22px rgba(60,80,40,.18)}
+.cico{border:2px solid rgba(0,0,0,.06)}
+.menu{background:#fff0d6;border:2px dashed #edd2a0}
+.menu b{color:#d9772f}
+.cfoot .route-btn{border-radius:16px}
+.bar{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow),0 12px 22px rgba(60,80,40,.2);backdrop-filter:none}
+.bbtn{color:var(--ink)}
+.bbtn[aria-selected="true"]{background:var(--mint);color:#fff;box-shadow:0 4px 0 #3f8f48}
+.panel{background:linear-gradient(#cfe6cb,var(--grass))}
+.ptitle{color:var(--ink)}
+.box,.hero{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
+.slot{background:linear-gradient(160deg,#fff4dc,#ffe9e4);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
+.spinBtn{background:var(--mint);box-shadow:0 5px 0 #3f8f48}
+.ghost{border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
