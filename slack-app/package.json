@@ -1,0 +1,16 @@
+{
+  "name": "olive-matjido-slack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "올리브인터내셔널 맛지도 슬랙 앱 (맛집 찾기 · 오늘 뭐 먹지 · 랜덤 런치밋)",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@slack/bolt": "^3.22.0",
+    "dotenv": "^16.4.5"
+  }
+}

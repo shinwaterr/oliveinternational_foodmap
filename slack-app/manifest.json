@@ -1,0 +1,25 @@
+{
+  "display_information": {
+    "name": "올리브 맛지도",
+    "description": "회사(그레이츠강남) 근처 맛집 찾기, 오늘 뭐 먹지, 랜덤 런치밋",
+    "background_color": "#ff7aa8"
+  },
+  "features": {
+    "bot_user": { "display_name": "맛지도", "always_online": true },
+    "app_home": { "messages_tab_enabled": true, "messages_tab_read_only_enabled": true, "home_tab_enabled": false },
+    "slash_commands": [
+      { "command": "/matjip", "description": "회사 근처 맛집 찾기 (메뉴나 가게 이름)", "usage_hint": "[일식 | 텐동 | 비워두면 메뉴 고르기]", "should_escape": false },
+      { "command": "/mwomeokji", "description": "오늘 뭐 먹지? 무작위로 한 곳 추천", "usage_hint": "[메뉴, 예: 중식]", "should_escape": false },
+      { "command": "/lunchmeet", "description": "랜덤 런치밋 신청·현황", "should_escape": false }
+    ]
+  },
+  "oauth_config": {
+    "scopes": { "bot": ["commands", "chat:write", "chat:write.public"] }
+  },
+  "settings": {
+    "interactivity": { "is_enabled": true },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}
