@@ -475,7 +475,7 @@ function refreshMap(fit){
   else cards.innerHTML=v.map(cardHTML).join('');
   cards.querySelectorAll('.card[data-id]').forEach(el=>el.onclick=e=>{if(e.target.closest('a')) return; goCard(curList.findIndex(d=>d.id===+el.dataset.id));});
   cards.scrollLeft=0;
-  $('#cnav').hidden=v.length<1; updateNav();
+  $('#cnav').hidden=v.length<1||state.tab!=='map'; updateNav();
   placeFab();
   if(fit){ if(v.length) fitPoints([{x:0,y:0},...v.map(d=>({x:d.x,y:d.y}))]); else goHome(); }
 }
@@ -546,7 +546,7 @@ function setTab(t){
   state.tab=t;
   document.querySelectorAll('.bbtn').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   const isMap=t==='map';
-  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap;
+  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
   $('#pickPanel').hidden=t!=='pick'; $('#meetPanel').hidden=t!=='meet';
   if(isMap) placeFab();
   if(t==='meet') meetInit();
