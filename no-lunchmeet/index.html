@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#94d4a2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>올리브인터내셔널 맛지도 (기본형)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: one-screen mobile app — three tabs (지도 / 오늘 뭐 먹지 / 랜덤 런치밋) behind one floating pill bar */
+:root{
+  /* Layout: cozy island game map — grass field with dirt paths, trees & pond; cream paper UI with wooden signboards */
+  --grass:#dcebd8; --grassDeep:#c9e0c4; --tuft:#5fae72;
+  --sky:#b7e3c0; --sky2:#94d4a2; --ground:#94d4a2;
+  --block:#ffffff; --park:#c9efd3; --road:#ffffff; --roadEdge:#d9e8dc; --mapSky:#d6efd9; --mapGround:#f2f8f1;
+  --ink:#5b3d22; --ink2:#8b6d50; --line:#e7d5ad;
+  --card:#fffaf0f2; --cardSolid:#fffaf0; --paperEdge:#e6d2a4; --paperShadow:#d2b77d;
+  --wood:#b47a45; --woodDeep:#7f5129; --woodText:#fff6e2;
+  --accent:#3b9bd4; --accentSoft:#dcf0fb;
+  --pink:#f0768a; --pinkSoft:#ffe5e3; --mint:#5cb766; --mintSoft:#e0f4da; --sun:#f5c445; --sunSoft:#fff2c7;
+  --route:#4caf50; --routeDeep:#358a39; --routeSoft:#dcf3d6;
+  --shadow:0 5px 0 rgba(122,88,45,.22),0 10px 20px rgba(70,90,50,.18);
+  --display:"Jua","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--sky2);color:var(--ink);font-family:var(--body);overflow:hidden}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,input,select{font-family:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{position:relative;height:100%;max-width:460px;margin:0 auto;overflow:hidden;background:var(--ground);box-shadow:0 0 0 1px var(--line)}
+
+/* ===== map ===== */
+#map{position:absolute;inset:0;touch-action:none;cursor:grab;background:radial-gradient(1200px 600px at 50% -10%,var(--mapSky),transparent 60%),var(--mapGround)}
+#map.drag{cursor:grabbing}
+#layer{position:absolute;left:0;top:0;transform-origin:0 0}
+#roads{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.pin{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:0}
+.bub{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:21px;background:var(--cardSolid);
+  box-shadow:0 4px 0 var(--c,#ccc),0 8px 14px rgba(40,70,120,.22);border:3px solid var(--c,#ccc);transition:transform .18s}
+.pin:hover .bub,.pin.on .bub{transform:translateY(-4px) scale(1.12)}
+.pin.on{z-index:20}
+.tag{font-family:var(--display);font-size:11.5px;background:var(--card);padding:2px 7px;border-radius:99px;white-space:nowrap;box-shadow:0 2px 6px rgba(40,70,120,.15);max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.hideTags .pin:not(.on) .tag{display:none}
+.pin.dim{opacity:.18;pointer-events:none}
+.pin.hide{display:none}
+.hq{position:absolute;z-index:15;display:flex;flex-direction:column;align-items:center;border:0;background:none;padding:0}
+.hq .ring{position:absolute;left:50%;bottom:-6px;width:140px;height:46px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--pink) 35%,transparent),transparent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{transform:translateX(-50%) scale(1.25);opacity:.5}}
+.hq .label{font-family:var(--display);font-size:14px;background:var(--pink);color:#fff;padding:4px 12px;border-radius:99px;box-shadow:0 4px 0 #e05c8b;margin-bottom:4px;white-space:nowrap}
+.station{position:absolute;font-family:var(--display);font-size:13px;background:#3cb371;color:#fff;padding:3px 10px;border-radius:99px;box-shadow:0 3px 0 #2a8a55;white-space:nowrap;pointer-events:none}
+#routeSvg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+#routeSvg .rcase{fill:none;stroke:var(--cardSolid);stroke-linecap:round;stroke-linejoin:round}
+#routeSvg .rline{fill:none;stroke:var(--route);stroke-linecap:round;stroke-linejoin:round}
+#routeSvg .rflow{fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;opacity:.85;animation:flow 1s linear infinite}
+#routeSvg .rguess{stroke-dasharray:var(--dash)}
+@keyframes flow{to{stroke-dashoffset:calc(var(--gap) * -1)}}
+.routeBar{position:absolute;left:max(14px,env(safe-area-inset-left,0px));right:max(14px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:31;background:var(--cardSolid);border-radius:24px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;border:2px solid var(--route)}
+.rb1{display:flex;align-items:center;gap:10px}
+.rb1 .ic{width:40px;height:40px;border-radius:14px;background:var(--routeSoft);display:grid;place-items:center;font-size:21px;flex:none}
+.rb1 .tt{font-family:var(--display);font-size:16px;line-height:1.25;min-width:0}
+.rb1 .tt small{display:block;font-family:var(--body);font-size:12px;color:var(--ink2)}
+.rb1 .x{margin-left:auto;flex:none;width:34px;height:34px;border-radius:50%;border:0;background:var(--ground);font-size:15px}
+.rb2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rb2 .big{font-family:var(--display);font-size:22px;color:var(--route);font-variant-numeric:tabular-nums}
+.rb2 .sub{font-size:12.5px;color:var(--ink2)}
+.rbMaps{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rbMaps a{display:flex;align-items:center;justify-content:center;gap:6px;height:38px;border-radius:99px;font-family:var(--display);font-size:13.5px;text-decoration:none;white-space:nowrap}
+.rbMaps .mk{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;font-size:12px;line-height:1;font-family:Arial,sans-serif;font-weight:700}
+.rbMaps .kakao{color:#3a2a00;background:#fee500}.rbMaps .kakao .mk{background:#3a2a00;color:#fee500}
+.rbMaps .place{color:#fff;background:var(--pink);box-shadow:0 3px 0 #e05c8b}
+.rnote{font-size:11.5px;color:var(--ink2);line-height:1.45}
+.exitMark{position:absolute;display:flex;align-items:center;gap:3px;padding:2px 7px 2px 2px;border-radius:99px;background:#3cb371;color:#fff;font-family:var(--display);font-size:11.5px;line-height:1;white-space:nowrap;box-shadow:0 2px 0 #2a8a55,0 4px 8px rgba(40,70,120,.18);pointer-events:none;z-index:5}
+.exitMark b{display:grid;place-items:center;min-width:19px;height:19px;border-radius:50%;background:#fff;color:#2a8a55;font-weight:400;font-size:12px;padding:0 3px}
+.exitMark.hq8{background:var(--pink);box-shadow:0 2px 0 #e05c8b,0 4px 8px rgba(40,70,120,.18)}
+.exitMark.hq8 b{color:#e05c8b}
+.roadname{font-family:var(--display);fill:var(--ink2);opacity:.8}
+
+/* ===== shared chrome ===== */
+.top{position:absolute;left:0;right:0;top:0;z-index:30;background:linear-gradient(var(--ground) 0,var(--ground) 72%,transparent);padding-bottom:12px!important;padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 0 max(14px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.top>*{pointer-events:auto}
+.hdr{display:flex;align-items:center;gap:10px}
+.title{font-family:var(--display);font-size:clamp(19px,5.6vw,25px);line-height:1.1;min-width:0;letter-spacing:-.5px;text-shadow:0 2px 0 var(--card)}
+.title small{display:block;font-family:var(--body);font-size:11.5px;color:var(--ink2);letter-spacing:0;margin-top:4px}
+.sp{flex:1}
+.round{width:42px;height:42px;border-radius:50%;border:0;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;font-size:18px;backdrop-filter:blur(8px)}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:18px;padding:0 14px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+.search input{flex:1;border:0;background:none;font-size:14.5px;padding:12px 0;min-width:0}
+.search input::placeholder{color:var(--ink2)}
+.chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:2px 14px 6px;margin:0 -14px}
+.chips::-webkit-scrollbar{display:none}
+.chips.wrap{flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+.chip{flex:none;border:0;border-radius:99px;padding:7px 12px 7px 9px;background:var(--card);box-shadow:0 4px 12px rgba(52,94,160,.14);font-family:var(--display);font-size:13.5px;display:flex;align-items:center;gap:5px;backdrop-filter:blur(8px)}
+.chip .e{font-size:16px}
+.chip .n{font-family:var(--body);font-size:11px;color:var(--ink2)}
+.chip[aria-pressed="true"]{background:var(--chipOn,var(--ink));color:#fff}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.75}
+.fab{position:absolute;right:max(14px,env(safe-area-inset-right,0px));z-index:25;display:flex;flex-direction:column;gap:8px}
+
+/* bottom: cards + pill bar */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.sheet>*{pointer-events:auto}
+.cards{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:8px max(14px,env(safe-area-inset-left,0px)) 12px;scrollbar-width:none}
+.cards::-webkit-scrollbar{display:none}
+.carousel{position:relative;container-type:inline-size;--cw:min(320px,84cqw)}
+.cards:not(.solo){padding-left:calc((100cqw - var(--cw)) / 2);padding-right:calc((100cqw - var(--cw)) / 2)}
+.cards:not(.solo) .card{width:var(--cw)}
+.cnav{display:flex;align-items:center;justify-content:center;gap:12px;padding:0 0 10px}
+.arrow{width:44px;height:44px;border-radius:50%;border:0;background:var(--cardSolid);box-shadow:0 5px 14px rgba(52,94,160,.22);font-family:var(--display);font-size:20px;color:var(--ink);display:grid;place-items:center;transition:transform .15s,opacity .2s}
+.arrow:active{transform:scale(.9)}
+.arrow:disabled{opacity:.35;cursor:default}
+.counter{min-width:76px;text-align:center;font-family:var(--display);font-size:14px;background:var(--card);border-radius:99px;padding:7px 12px;box-shadow:0 3px 10px rgba(52,94,160,.14);font-variant-numeric:tabular-nums;backdrop-filter:blur(8px)}
+.counter small{font-family:var(--body);color:var(--ink2);font-size:12px}
+.cards.solo{justify-content:center;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.cards.solo .card{margin:0 auto}
+.card.hint{width:min(340px,92%);align-items:center;text-align:center;background:linear-gradient(150deg,var(--pinkSoft),var(--accentSoft))}
+.card.hint .big{font-size:34px;line-height:1}
+.card.hint .cname{font-size:18px}
+.card.hint .desc{-webkit-line-clamp:3;min-height:0}
+.card{flex:none;width:min(300px,80%);scroll-snap-align:center;background:var(--cardSolid);border-radius:24px;padding:14px 16px;box-shadow:var(--shadow);border:2px solid transparent;display:flex;flex-direction:column;gap:8px;text-align:left}
+.card.on{border-color:var(--c)}
+.crow{display:flex;gap:10px;align-items:center}
+.cico{width:46px;height:46px;flex:none;border-radius:16px;display:grid;place-items:center;font-size:25px;background:var(--cbg)}
+.cname{font-family:var(--display);font-size:17.5px;line-height:1.2;min-width:0}
+.ccat{font-size:11.5px;color:var(--ink2)}
+.menu{font-size:13px;background:var(--pinkSoft);border-radius:12px;padding:7px 10px;line-height:1.4}
+.menu b{font-family:var(--display);font-weight:400;color:var(--pink);margin-right:4px}
+.desc{font-size:12.5px;color:var(--ink2);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.9em}
+.exitTag{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;font-family:var(--display);font-size:12.5px;color:#fff;background:#3cb371;border-radius:99px;padding:4px 10px;line-height:1}
+.exitTag .no{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:50%;background:#fff;color:#2a8a55;font-size:11.5px;padding:0 3px}
+.exitTag small{font-family:var(--body);font-size:11.5px;opacity:.9}
+.cfoot{display:grid;grid-template-columns:1fr;gap:8px}
+.cmeta{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12.5px;color:var(--ink2);margin-top:2px}
+.cmeta .dot{opacity:.5}
+.cmeta .ex{color:#2a8a55;font-family:var(--display)}
+.walk{font-family:var(--display);font-size:13px;color:var(--accent);background:var(--accentSoft);border-radius:99px;padding:3px 9px;white-space:nowrap}
+.cfoot .pill{display:flex;align-items:center;justify-content:center;gap:4px;height:36px;padding:0 6px;border:0;border-radius:99px;font-family:var(--display);font-size:13px;line-height:1;white-space:nowrap;text-decoration:none;min-width:0}
+.cfoot .pill .pi{font-size:15px;width:16px;text-align:center;flex:none}
+.cfoot .walkp{color:var(--accent);background:var(--accentSoft)}
+.cfoot .nv{color:#fff;background:var(--pink);box-shadow:0 3px 0 #e05c8b}
+.cfoot .route-btn{color:#fff;background:var(--route);box-shadow:0 3px 0 var(--routeDeep)}
+.bar{display:flex;gap:6px;align-items:center;margin:0 max(14px,env(safe-area-inset-left,0px));background:var(--card);border-radius:999px;padding:6px;box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+.bbtn{flex:1;border:0;background:none;border-radius:999px;padding:11px 4px;font-family:var(--display);font-size:14px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;transition:background .2s,color .2s}
+.bbtn .i{font-size:17px}
+.bbtn[aria-selected="true"]{background:linear-gradient(135deg,var(--pink),#ffa26b);color:#fff;box-shadow:0 4px 0 #e05c8b}
+@media (max-width:360px){.bbtn{font-size:12.5px}.bbtn .i{font-size:15px}}
+
+/* ===== panels (pick / meet) ===== */
+.panel{position:absolute;inset:0;z-index:32;overflow-y:auto;background:radial-gradient(900px 420px at 50% -8%,var(--sky),transparent 65%),var(--ground);
+  padding:calc(18px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(100px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.ptitle{font-family:var(--display);font-size:27px;line-height:1.1;letter-spacing:-.5px}
+.ptitle small{display:block;font-family:var(--body);font-size:12.5px;color:var(--ink2);letter-spacing:0;margin-top:6px;line-height:1.45}
+.box{background:var(--cardSolid);border-radius:26px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.lbl{font-family:var(--display);font-size:14px;display:flex;align-items:center;gap:6px}
+.lbl small{font-family:var(--body);font-size:11.5px;color:var(--ink2)}
+.seg{display:flex;background:var(--ground);border-radius:99px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;border-radius:99px;padding:8px 4px;font-family:var(--display);font-size:13.5px;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--cardSolid);color:var(--ink);box-shadow:0 2px 8px rgba(52,94,160,.15)}
+.box .chip{box-shadow:none;background:var(--ground);backdrop-filter:none}
+
+/* slot machine */
+.panel>*{flex-shrink:0}
+.slot{position:relative;border-radius:30px;padding:22px 18px 18px;text-align:center;background:linear-gradient(160deg,var(--pinkSoft),var(--sunSoft));box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;gap:8px;overflow:hidden}
+.slot .face{width:110px;height:110px;border-radius:36px;background:var(--cardSolid);display:grid;place-items:center;font-size:62px;box-shadow:0 6px 0 var(--sc,var(--pink)),0 14px 24px rgba(40,70,120,.18);border:4px solid var(--sc,var(--pink))}
+.slot.spin .face{animation:wob .14s linear infinite}
+@keyframes wob{25%{transform:rotate(-6deg) translateY(-2px)}75%{transform:rotate(6deg) translateY(-2px)}}
+.slot.done .face{animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{0%{transform:scale(.6)}100%{transform:none}}
+.slot .sname{font-family:var(--display);font-size:26px;line-height:1.15;min-height:1.2em}
+.slot .scat{font-size:12.5px;color:var(--ink2);min-height:1.2em}
+.slot .menu{background:var(--cardSolid);max-width:100%}
+.slot .desc{-webkit-line-clamp:3;min-height:0;text-align:center}
+.slot .hint{font-size:13px;color:var(--ink2);line-height:1.5}
+.spinBtn{border:0;border-radius:999px;padding:16px;font-family:var(--display);font-size:19px;color:#fff;background:linear-gradient(135deg,var(--pink),#ffa26b);box-shadow:0 5px 0 #e05c8b;width:100%}
+.spinBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #e05c8b}
+.spinBtn:disabled{opacity:.6}
+.row2{display:flex;gap:8px;width:100%}
+.ghost{flex:1;border:0;border-radius:18px;padding:12px;font-family:var(--display);font-size:14px;background:var(--cardSolid);color:var(--accent);box-shadow:0 3px 10px rgba(52,94,160,.12);text-decoration:none;text-align:center}
+.ghost.nvg{color:#fff;background:#03c75a}
+.cnt{font-size:12px;color:var(--ink2);text-align:center}
+
+/* meet */
+.hero{border-radius:30px;padding:18px;background:linear-gradient(150deg,var(--mintSoft),var(--accentSoft));box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.hero .when{display:flex;align-items:center;gap:12px}
+.cal{width:62px;flex:none;border-radius:18px;background:var(--cardSolid);text-align:center;overflow:hidden;box-shadow:0 4px 0 var(--mint)}
+.cal .m{background:var(--mint);color:#fff;font-family:var(--display);font-size:12px;padding:3px 0}
+.cal .d{font-family:var(--display);font-size:26px;line-height:1.3}
+.cal .w{font-size:11px;color:var(--ink2);padding-bottom:4px}
+.when .t{font-family:var(--display);font-size:19px;line-height:1.25}
+.when .s{font-size:12.5px;color:var(--ink2);margin-top:3px}
+.stats{display:flex;gap:8px}
+.stat{flex:1;background:var(--cardSolid);border-radius:18px;padding:9px 10px;text-align:center}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11.5px;color:var(--ink2)}
+.how{display:flex;gap:6px;font-size:12px;color:var(--ink2);flex-wrap:wrap}
+.how span{background:var(--card);border-radius:99px;padding:4px 9px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input{border:2px solid var(--line);background:var(--ground);border-radius:16px;padding:12px 14px;font-size:15px;min-width:0}
+.field input:focus{border-color:var(--accent);outline:none}
+.teams{display:flex;gap:6px;flex-wrap:wrap}
+.teams button{border:0;border-radius:99px;padding:5px 10px;font-size:12.5px;background:var(--accentSoft);color:var(--accent);font-family:var(--display)}
+.joinBtn{border:0;border-radius:999px;padding:15px;font-family:var(--display);font-size:18px;color:#fff;background:linear-gradient(135deg,var(--mint),#29b3a4);box-shadow:0 5px 0 #23966c}
+.joinBtn:disabled{opacity:.55}
+.joined{display:flex;align-items:center;gap:12px}
+.joined .badge{width:52px;height:52px;border-radius:18px;background:var(--mintSoft);display:grid;place-items:center;font-size:28px;flex:none}
+.joined .t{font-family:var(--display);font-size:18px}
+.joined .s{font-size:12.5px;color:var(--ink2)}
+.linkBtn{border:0;background:none;color:var(--ink2);font-size:12.5px;text-decoration:underline;padding:4px;margin-left:auto}
+.people{display:flex;flex-wrap:wrap;gap:8px}
+.person{display:flex;align-items:center;gap:6px;background:var(--ground);border-radius:99px;padding:4px 10px 4px 4px;font-size:12.5px;max-width:100%}
+.person img{width:26px;height:26px;border-radius:50%;flex:none}
+.person .nm{font-family:var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person .tm{color:var(--ink2);white-space:nowrap}
+.group{border:2px solid var(--line);border-radius:22px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.group.mine{border-color:var(--mint);background:color-mix(in srgb,var(--mint) 8%,transparent)}
+.ghead{display:flex;align-items:center;gap:8px}
+.gno{font-family:var(--display);font-size:15px}
+.gmine{font-family:var(--display);font-size:11.5px;color:#fff;background:var(--mint);border-radius:99px;padding:2px 8px}
+.gplace{display:flex;align-items:center;gap:10px;background:var(--cardSolid);border-radius:16px;padding:8px 10px;border:0;text-align:left;width:100%}
+.gplace .cico{width:38px;height:38px;font-size:20px;border-radius:12px}
+.gplace .nm{font-family:var(--display);font-size:15px}
+.gplace .mn{font-size:12px;color:var(--ink2)}
+.admin{border:2px dashed var(--line);border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.admin .lbl{color:var(--ink2)}
+.arow{display:flex;gap:8px;flex-wrap:wrap}
+.arow input{flex:1;min-width:140px;border:2px solid var(--line);background:var(--ground);border-radius:14px;padding:9px 12px;font-size:14px}
+.abtn{border:0;border-radius:14px;padding:10px 14px;font-family:var(--display);font-size:14px;background:var(--ink);color:var(--cardSolid)}
+.abtn.soft{background:var(--accentSoft);color:var(--accent)}
+.abtn.warn{background:var(--pinkSoft);color:var(--pink)}
+.msg{font-size:12.5px;color:var(--ink2);line-height:1.5}
+.msg.err{color:var(--pink)}
+.notice{background:var(--sunSoft);border-radius:18px;padding:12px 14px;font-size:13px;line-height:1.55}
+/* ===== cozy game skin ===== */
+body{background:var(--grass)}
+.app{background:var(--mapGround);box-shadow:none}
+.roadname{fill:#7a8aa3;opacity:.8}
+.top{background:linear-gradient(var(--mapGround) 0,var(--mapGround) 70%,transparent)}
+.title{display:inline-block;background:var(--wood);color:var(--woodText);padding:7px 14px 6px;border-radius:14px;border:3px solid var(--woodDeep);box-shadow:0 4px 0 #5e3a1b;text-shadow:0 2px 0 rgba(0,0,0,.18);font-size:clamp(17px,5vw,22px);position:relative}
+.title::before,.title::after{content:"";position:absolute;top:50%;width:6px;height:6px;border-radius:50%;background:var(--woodDeep);transform:translateY(-50%)}
+.title::before{left:6px}.title::after{right:6px}
+.round,.search,.chip,.arrow,.counter{background:var(--cardSolid);border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow);backdrop-filter:none}
+.chip{color:var(--ink)}
+.chip[aria-pressed="true"]{border-color:rgba(0,0,0,.12);box-shadow:0 4px 0 rgba(0,0,0,.22)}
+.arrow:active,.chip:active,.round:active{transform:translateY(3px);box-shadow:0 1px 0 var(--paperShadow)}
+.bub{background:var(--cardSolid);border-width:3.5px;box-shadow:0 4px 0 rgba(0,0,0,.2),0 8px 12px rgba(40,70,40,.2)}
+.tag{background:var(--wood);color:var(--woodText);border:2px solid var(--woodDeep);border-radius:8px;box-shadow:0 2px 0 #5e3a1b;padding:2px 7px}
+.hq .label{background:var(--wood);color:var(--woodText);border:2.5px solid var(--woodDeep);border-radius:10px;box-shadow:0 3px 0 #5e3a1b}
+.hq .ring{background:radial-gradient(closest-side,rgba(255,250,200,.75),transparent)}
+.station{background:#3b8fd6;border:2.5px solid #2a6ca6;border-radius:10px;box-shadow:0 3px 0 #1f5585}
+.exitMark{background:#fffaf0;color:var(--ink);border:2px solid #b8a37a;box-shadow:0 2px 0 #9c8760;padding:1px 7px 1px 1px}
+.exitMark b{background:#5cb766;color:#fff}
+.exitMark.hq8{background:#fffaf0;border-color:var(--wood);box-shadow:0 2px 0 var(--woodDeep)}
+.exitMark.hq8 b{background:var(--pink);color:#fff}
+.hideTags .exitMark{font-size:0;gap:0;padding:1px}
+.hideTags .exitMark b{font-size:11px}
+.card.hint{background:var(--cardSolid);background-image:radial-gradient(rgba(214,190,140,.18) 1px,transparent 1.2px);background-size:12px 12px}
+.card{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow),0 12px 22px rgba(60,80,40,.18);border-radius:26px;background-image:radial-gradient(rgba(214,190,140,.18) 1px,transparent 1.2px);background-size:12px 12px}
+.card.on{border-color:var(--c);box-shadow:0 6px 0 color-mix(in srgb,var(--c) 70%,#000 10%),0 12px 22px rgba(60,80,40,.18)}
+.cico{border:2px solid rgba(0,0,0,.06)}
+.menu{background:#fff0d6;border:2px dashed #edd2a0}
+.menu b{color:#d9772f}
+.cfoot .route-btn{border-radius:16px}
+.bar{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow),0 12px 22px rgba(60,80,40,.2);backdrop-filter:none}
+.bbtn{color:var(--ink)}
+.bbtn[aria-selected="true"]{background:var(--mint);color:#fff;box-shadow:0 4px 0 #3f8f48}
+.panel{background:linear-gradient(#cfe6cb,var(--grass))}
+.ptitle{color:var(--ink)}
+.box,.hero{background:var(--cardSolid);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
+.slot{background:linear-gradient(160deg,#fff4dc,#ffe9e4);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
+.spinBtn{background:var(--mint);box-shadow:0 5px 0 #3f8f48}
+.ghost{border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app" id="app">
+  <!-- MAP TAB -->
+  <div id="map"><div id="layer"><svg id="roads"></svg><svg id="routeSvg" width="1" height="1"></svg></div></div>
+  <div class="top" id="mapTop">
+    <div class="hdr">
+      <div class="title">올리브인터내셔널 맛지도</div>
+      <div class="sp"></div>
+      <button class="round" id="tagBtn" aria-label="가게 이름 보기 전환" title="가게 이름 보기">🏷️</button>
+    </div>
+    <label class="search"><span aria-hidden="true">🔍</span><input id="q" type="search" placeholder="가게 이름이나 메뉴 검색 (예: 텐동, 국밥)" autocomplete="off"></label>
+    <div class="chips" id="chips" role="toolbar" aria-label="카테고리"></div>
+  </div>
+  <div class="routeBar" id="routeBar" hidden></div>
+  <div class="fab" id="fab">
+    <button class="round" id="zin" aria-label="확대">＋</button>
+    <button class="round" id="zout" aria-label="축소">－</button>
+    <button class="round" id="home" aria-label="회사 위치로" title="회사 위치로">🏢</button>
+  </div>
+
+  <!-- PICK TAB -->
+  <section class="panel" id="pickPanel" hidden aria-labelledby="pickTitle">
+    <div class="ptitle" id="pickTitle">오늘 뭐 먹지? 🎲<small>고민은 그만! 조건만 고르고 돌려보세요.</small></div>
+    <div class="slot" id="slot">
+      <div class="face" id="sFace">🍱</div>
+      <div class="scat" id="sCat"></div>
+      <div class="sname" id="sName">무엇이 나올까요?</div>
+      <div id="sBody" class="hint">아래 버튼을 누르면 피플팀 맛집 중에서<br>한 곳을 골라드려요.</div>
+    </div>
+    <button class="spinBtn" id="spinBtn">돌리기!</button>
+    <div class="row2" id="sActions" hidden>
+      <a class="ghost" id="sMap" href="#" target="_blank" rel="noopener">🧭 길안내</a>
+    </div>
+    <div class="box">
+      <div class="lbl">🚶 얼마나 걸을까요?</div>
+      <div class="seg" id="walkSeg">
+        <button data-w="5" aria-pressed="false">5분 이내</button>
+        <button data-w="10" aria-pressed="true">10분 이내</button>
+        <button data-w="99" aria-pressed="false">상관없어요</button>
+      </div>
+      <div class="lbl">🍽️ 땡기는 메뉴 <small>여러 개 고를 수 있어요 · 안 고르면 전체</small></div>
+      <div class="chips wrap" id="pickChips"></div>
+      <div class="cnt" id="pickCount"></div>
+    </div>
+  </section>
+
+  <!-- MEET TAB -->
+  <section class="panel" id="meetPanel" hidden aria-labelledby="meetTitle">
+    <div class="ptitle" id="meetTitle">랜덤 런치밋 🤝<small>다른 팀 동료들과 랜덤으로 한 조가 되어 점심을 먹어요.<br>신청만 하면 조와 식당은 자동으로 정해져요.</small></div>
+    <div class="hero">
+      <div class="when">
+        <div class="cal"><div class="m" id="calM"></div><div class="d" id="calD"></div><div class="w" id="calW"></div></div>
+        <div><div class="t" id="whenT"></div><div class="s" id="whenS">점심 12:00 · 조별 3~4명</div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="stN">0</b><span>신청자</span></div>
+        <div class="stat"><b id="stT">0</b><span>참여 팀</span></div>
+        <div class="stat"><b id="stG">-</b><span>예상 조</span></div>
+      </div>
+      <div class="how"><span>① 팀 적고 신청</span><span>② 다른 팀끼리 자동 조 편성</span><span>③ 조별 식당 추천</span></div>
+    </div>
+    <div id="meetBody"></div>
+  </section>
+
+  <!-- BOTTOM -->
+  <div class="sheet">
+    <div class="carousel" id="carousel"><div class="cards" id="cards"></div><div class="cnav" id="cnav" hidden><button class="arrow" id="prevCard" aria-label="이전 맛집">‹</button><div class="counter" id="counter" aria-live="polite"></div><button class="arrow" id="nextCard" aria-label="다음 맛집">›</button></div></div>
+    <nav class="bar" role="tablist" aria-label="메뉴">
+      <button class="bbtn" role="tab" data-tab="map" aria-selected="true"><span class="i">🗺️</span>지도</button>
+      <button class="bbtn" role="tab" data-tab="pick" aria-selected="false"><span class="i">🎲</span>오늘 뭐 먹지</button>
+    </nav>
+  </div>
+</div>
+
+<script>
+const HQ = {"lat": 37.49663727, "lon": 127.02510477, "kx": 505550, "ky": 1110328};
+const DATA = [{"id":0,"name":"Poke All Day","short":"Poke All Day","cat":"샐러드&샌드위치","menu":"곡물밥 포케","desc":"포케 & 샐러드집","link":"https://naver.me/xwmqSxPS","addr":"서울 서초구 서초대로74길 11 삼성전자빌딩 지하2층","lat":37.49646,"lon":127.026698,"kx":505902,"ky":1110279,"exit":6,"exitM":110},{"id":1,"name":"프로티너 강남역점","short":"프로티너","cat":"샐러드&샌드위치","menu":"닭가슴살 박스","desc":"건강한 도시락 느낌! 식단하는 분들 추천","link":"https://naver.me/IFgd2MhI","addr":"서울 강남구 강남대로78길 12 예미프레스티지 1층 101,102호","lat":37.494892,"lon":127.030305,"kx":506698,"ky":1109844,"exit":4,"exitM":130},{"id":2,"name":"슬로우캘리","short":"슬로우캘리","cat":"샐러드&샌드위치","menu":"블랙페퍼 치킨 보울","desc":"보울도 포케도 다 맛있는 곳","link":"https://naver.me/FoEN8zYA","addr":"서울 강남구 강남대로66길 14 와이즈플레이스 1층 109호","lat":37.491676,"lon":127.031997,"kx":507072,"ky":1108951,"exit":5,"exitM":500},{"id":4,"name":"써브웨이 강남역GT타워점","short":"써브웨이","cat":"샐러드&샌드위치","menu":"에그마요","desc":"다 아시져","link":"https://naver.me/IFgqc4TQ","addr":"서울 서초구 서초대로 411 동관 1층 1~3호","lat":37.4981,"lon":127.025968,"kx":505741,"ky":1110734,"exit":9,"exitM":80},{"id":5,"name":"딜리셧 부티끄","short":"딜리셧 부티끄","cat":"샐러드&샌드위치","menu":"스테이크 샐러드","desc":"조금 멀어요","link":"https://naver.me/G0DXBoxC","addr":"서울 강남구 테헤란로4길 6 219호","lat":37.497667,"lon":127.029286,"kx":506473,"ky":1110614,"exit":1,"exitM":60},{"id":6,"name":"이삭토스트 강남점","short":"이삭토스트","cat":"샐러드&샌드위치","menu":"햄스페셜","desc":"매장이 좁지만 보장된 아는 맛","link":"https://naver.me/x67YJNv7","addr":"서울 서초구 서초대로74길 23 서초타운트라팰리스 1층 106호","lat":37.495631,"lon":127.027202,"kx":506013,"ky":1110049,"exit":6,"exitM":130},{"id":7,"name":"아티제 삼성타운점","short":"아티제","cat":"카페","menu":"딸기들어간 메뉴들","desc":"딸기케이크 맛집. 다들 아시죠?","link":"https://naver.me/5k7fQIFY","addr":"서울 서초구 서초대로74길 11 삼성전자빌딩 지하1층","lat":37.496699,"lon":127.026933,"kx":505954,"ky":1110345,"exit":7,"exitM":90},{"id":8,"name":"돈카춘 강남역","short":"돈카춘","cat":"일식","menu":"마제소바+돈까스 세트","desc":"합리적인 가격으로 마제소바와 돈카츠까지!","link":"https://naver.me/x4FBhCHv","addr":"서울 서초구 강남대로55길 9-7 2층 201호","lat":37.495437,"lon":127.02759,"kx":506099,"ky":1109995,"exit":5,"exitM":90},{"id":9,"name":"고에몬 강남점","short":"고에몬","cat":"일식","menu":"수플레오믈렛","desc":"일본식 수플레 오믈렛 맛집","link":"https://naver.me/xZVbkVCL","addr":"서울 서초구 서초대로77길 7 1층","lat":37.498446,"lon":127.026356,"kx":505826,"ky":1110830,"exit":10,"exitM":60},{"id":10,"name":"베트남이랑","short":"베트남이랑","cat":"기타","menu":"반미, 쌀국수 등 모든 것","desc":"베트남에 온 것 같은 기분을 내고싶을 때","link":"https://naver.me/xeAfD3Yd","addr":"서울 서초구 서초대로77길 15 대경빌딩 지하1층","lat":37.498951,"lon":127.026095,"kx":505769,"ky":1110970,"exit":10,"exitM":90},{"id":11,"name":"중경마라탕","short":"중경마라탕","cat":"중식","menu":"마라샹궈","desc":"마라탕도 맛있지만, 마라샹궈 맛집","link":"https://naver.me/GWe28Q6z","addr":"서울 강남구 테헤란로1길 44 2층","lat":37.501239,"lon":127.027086,"kx":505988,"ky":1111605,"exit":11,"exitM":270},{"id":12,"name":"딘타이펑 강남점","short":"딘타이펑","cat":"중식","menu":"샤오롱바오","desc":"글로벌 딤섬 체인점","link":"https://naver.me/F2Zuxy8E","addr":"서울 서초구 서초대로73길 12 세계빌딩 2층","lat":37.498519,"lon":127.025614,"kx":505662,"ky":1110850,"exit":10,"exitM":120},{"id":13,"name":"일일향 강남역3호점","short":"일일향","cat":"중식","menu":"짜장면","desc":"유명 체인점","link":"https://naver.me/xKERQP9D","addr":"서울 서초구 서초대로78길 22 홍우빌딩 3층","lat":37.495798,"lon":127.027528,"kx":506085,"ky":1110095,"exit":6,"exitM":100},{"id":14,"name":"송탄부대찌개와보쌈","short":"송탄부대찌개와보쌈","cat":"한식-국물(찌개 포함)","menu":"송탄부대찌개","desc":"부찌 맛집","link":"https://naver.me/GlJIuQiP","addr":"서울 서초구 서초대로78길 34 1층","lat":37.494892,"lon":127.028066,"kx":506204,"ky":1109844,"exit":5,"exitM":60},{"id":15,"name":"농민백암순대","short":"농민백암순대","cat":"한식-국물(찌개 포함)","menu":"국밥","desc":"여긴 얼이 담겨 있어요 찐이에요","link":"https://naver.me/GbDFjzQF","addr":"서울 강남구 역삼로3길 20-4 1층","lat":37.494915,"lon":127.031513,"kx":506965,"ky":1109850,"exit":4,"exitM":230},{"id":16,"name":"동달식당","short":"동달식당","cat":"한식-국물(찌개 포함)","menu":"점심메뉴","desc":"뚝불을 비롯한 찌개류","link":"https://naver.me/Fy2mdHej","addr":"서울 서초구 서운로 133","lat":37.495365,"lon":127.024717,"kx":505464,"ky":1109975,"exit":6,"exitM":320},{"id":17,"name":"소호정","short":"소호정","cat":"한식-국물(찌개 포함)","menu":"국수","desc":"소고기 안동국시 & 국밥집. 소고기라 가격은 좀 있어요","link":"https://naver.me/5YFcgGYW","addr":"서울 서초구 서초대로78길 22 홍우빌딩 2층","lat":37.495861,"lon":127.027457,"kx":506069,"ky":1110112,"exit":6,"exitM":90},{"id":19,"name":"더뭉티기","short":"더뭉티기","cat":"한식-일반","menu":"육회비빔밥(런치)","desc":"퀄리티 좋은 육빔! 같이 나오는 무국도 굳 (육빔 특은 기본이랑 큰 차이 없으니 비추)","link":"https://naver.me/5wWec9ni","addr":"서울 서초구 강남대로53길 12 110호","lat":37.494487,"lon":127.027839,"kx":506154,"ky":1109731,"exit":5,"exitM":110},{"id":20,"name":"신도세기","short":"신도세기","cat":"한식-일반","menu":"점심특선","desc":"맛지도에 없었는데, 많이 가는 그곳! 점심특선 추천추천","link":"https://naver.me/5BcjOXTu","addr":"서울 서초구 서초대로78길 22 홍우빌딩 3층","lat":37.495771,"lon":127.027565,"kx":506093,"ky":1110088,"exit":6,"exitM":100},{"id":21,"name":"선향정샤브샤브","short":"선향정샤브샤브","cat":"한식-일반","menu":"소고기야채 샤브","desc":"맛지도에 없지만 모두가 알고 있고 애용하던 그 곳!","link":"https://naver.me/5ssTAtLO","addr":"서울 서초구 강남대로55길 24 풍림아이원매직 2층 202~203호","lat":37.495671,"lon":127.025544,"kx":505647,"ky":1110060,"exit":6,"exitM":240},{"id":22,"name":"순남시래기","short":"순남시래기","cat":"한식-일반","menu":"얼큰시래기국","desc":"시래기를 테마로한 밥집","link":"https://naver.me/x1VvsVkN","addr":"서울 서초구 서초대로74길 23 지하 104호","lat":37.495626,"lon":127.027095,"kx":505989,"ky":1110048,"exit":6,"exitM":130},{"id":23,"name":"삼성각","short":"삼성각","cat":"중식","menu":"꿔바로우…?","desc":"꿔바로우가 유명하대요","link":"https://naver.me/FRLNA8aB","addr":"서울 서초구 서초대로78길 42 2층","lat":37.494023,"lon":127.028238,"kx":506242,"ky":1109602,"exit":5,"exitM":140},{"id":24,"name":"중식당표량","short":"중식당표량","cat":"중식","menu":"차돌짬뽕","desc":"넓은 중식당! 회사에서도 가까움","link":"https://naver.me/Gxk1bbGM","addr":"서울 서초구 서운로 133 2층","lat":37.495374,"lon":127.024706,"kx":505462,"ky":1109978,"exit":6,"exitM":320},{"id":25,"name":"마라공방","short":"마라공방","cat":"중식","menu":"마라탕","desc":"마라탕 마라샹궈","link":"https://naver.me/GgWkGrcr","addr":"서울 강남구 강남대로84길 6 2층","lat":37.496419,"lon":127.029184,"kx":506451,"ky":1110268,"exit":3,"exitM":70},{"id":26,"name":"오한수 우육면가","short":"오한수 우육면가","cat":"중식","menu":"홍콩우육탕면","desc":"우육탕면을 포함한 완탕면, 군만두 등이 먹고싶을 때!","link":"https://naver.me/GyYbKhRH","addr":"서울 강남구 테헤란로 124 삼원타워 지하1층 30호","lat":37.498735,"lon":127.031465,"kx":506954,"ky":1110910,"exit":1,"exitM":250},{"id":27,"name":"무궁화반점","short":"무궁화반점","cat":"중식","menu":"순두부 짬뽕","desc":"계란후라이를 먹을 수 있는 중국집","link":"https://naver.me/FfeOJDSH","addr":"서울 강남구 테헤란로1길 10 세경빌딩","lat":37.49896,"lon":127.028227,"kx":506239,"ky":1110972,"exit":12,"exitM":60},{"id":28,"name":"남소관 우육도삭면","short":"남소관 우육도삭면","cat":"중식","menu":"우육도삭면","desc":"도삭면집!!","link":"https://naver.me/513NC1AD","addr":"서울 강남구 테헤란로1길 19 로하스애비뉴빌딩 1-2층","lat":37.4996,"lon":127.027514,"kx":506082,"ky":1111150,"exit":11,"exitM":80},{"id":29,"name":"팀호완 강남역점","short":"팀호완","cat":"중식","menu":"X.O 차슈 볶음밥, 샤오마이","desc":"유명한 거기","link":"https://naver.me/GfCsiUnF","addr":"서울 강남구 테헤란로1길 29 용일빌딩 지하1층, 1층","lat":37.500104,"lon":127.027287,"kx":506032,"ky":1111290,"exit":11,"exitM":140},{"id":30,"name":"순대생각","short":"순대생각","cat":"한식-국물(찌개 포함)","menu":"순대국","desc":"순대국집!","link":"https://naver.me/FbOn6pZl","addr":"서울 서초구 서초대로74길 27 강남역한화오벨리스크 1층","lat":37.495392,"lon":127.027361,"kx":506048,"ky":1109982,"exit":5,"exitM":110},{"id":31,"name":"연희동칼국수","short":"연희동칼국수","cat":"한식-국물(찌개 포함)","menu":"칼국수","desc":"깊은 사골 국물맛의 칼국수","link":"https://naver.me/5YFdbzZa","addr":"서울 서초구 서초대로 411 GT타워 지하1층","lat":37.498104,"lon":127.025945,"kx":505736,"ky":1110735,"exit":9,"exitM":80},{"id":32,"name":"뽕족 강남역본점","short":"뽕족","cat":"저녁회식장소추천","menu":"족발","desc":"완전 촉촉야들한 족발","link":"https://naver.me/54LbaFq3","addr":"서울 강남구 테헤란로4길 15 메가시티오피스텔 1층 102~104호","lat":37.497311,"lon":127.030129,"kx":506659,"ky":1110515,"exit":1,"exitM":150},{"id":33,"name":"쿠차라","short":"쿠차라","cat":"기타","menu":"부리또","desc":"멕시코 음식점","link":"https://naver.me/xMjK7TN2","addr":"서울 서초구 서초대로74길 11 삼성전자빌딩 지하1층 B112호","lat":37.496581,"lon":127.026936,"kx":505954,"ky":1110312,"exit":6,"exitM":90},{"id":34,"name":"꾸아","short":"꾸아","cat":"기타","menu":"직화쌀국수","desc":"베트남음식점! 쌀국수랑 분짜랑~","link":"https://naver.me/5gFl2FH0","addr":"서울 강남구 강남대로102길 11 2층","lat":37.501924,"lon":127.026727,"kx":505908,"ky":1111795,"exit":11,"exitM":350},{"id":35,"name":"무삥과 팟타이","short":"무삥과 팟타이","cat":"기타","menu":"팟타이?","desc":"태국음식점. 회사랑 가까워요!","link":"https://naver.me/Fio7yuqC","addr":"서울 서초구 서초대로74길 29 2층","lat":37.494942,"lon":127.027423,"kx":506062,"ky":1109858,"exit":5,"exitM":110},{"id":36,"name":"하노이의아침","short":"하노이의아침","cat":"기타","menu":"톰얌쌀국수, 매운해물쌀국수","desc":"베트남 음식점","link":"https://naver.me/xgNSE36C","addr":"서울 서초구 강남대로55길 24","lat":37.495626,"lon":127.025577,"kx":505654,"ky":1110048,"exit":6,"exitM":240},{"id":37,"name":"바바인디아","short":"바바인디아","cat":"기타","menu":"런치A","desc":"인도커리집!","link":"https://naver.me/56R6K7i5","addr":"서울 서초구 강남대로 359 대우도씨에빛2차 2층","lat":37.494897,"lon":127.028578,"kx":506317,"ky":1109845,"exit":5,"exitM":40},{"id":38,"name":"청류벽","short":"청류벽","cat":"한식-일반","menu":"들기름막국수, 양지온반","desc":"막국수집인데, 들기름막국수도 팔아요","link":"https://naver.me/5du4tA27","addr":"서울 서초구 서초대로74길 29 1층 105호","lat":37.494906,"lon":127.027366,"kx":506049,"ky":1109848,"exit":5,"exitM":120},{"id":39,"name":"모랑해물솥밥","short":"모랑해물솥밥","cat":"한식-일반","menu":"곤드레솥밥","desc":"솥밥이 먹고싶을 때!","link":"https://naver.me/5vcHoKK7","addr":"서울 서초구 강남대로 359 대우도씨에빛2차 2층 212호","lat":37.49487,"lon":127.028533,"kx":506307,"ky":1109838,"exit":5,"exitM":50},{"id":41,"name":"군선생","short":"군선생","cat":"한식-일반","menu":"고등어구이가 근본 아닌가요","desc":"각종 생선구이집! (근데 느리게 나온대요)","link":"https://naver.me/FpxBs0X9","addr":"서울 서초구 강남대로55길 24 풍림아이원매직 지하1층","lat":37.495725,"lon":127.025645,"kx":505669,"ky":1110075,"exit":6,"exitM":230},{"id":42,"name":"1992 덮밥&짜글이","short":"1992 덮밥&짜글이","cat":"한식-일반","menu":"듬뿍짜글이","desc":"덮밥집! 정갈하게 한상차림으로 나와요","link":"https://naver.me/FbOnvSi6","addr":"서울 강남구 강남대로84길 6 1층","lat":37.496428,"lon":127.029195,"kx":506453,"ky":1110270,"exit":3,"exitM":70},{"id":43,"name":"영덕물회막회","short":"영덕물회막회","cat":"한식-일반","menu":"회덮밥, 버터김치알밥","desc":"회덮밥, 양념고등어 구이 등","link":"https://naver.me/5iTRNicE","addr":"서울 서초구 서초대로74길 23 B105호","lat":37.495572,"lon":127.027078,"kx":505986,"ky":1110032,"exit":5,"exitM":140},{"id":44,"name":"김인복의광평 강남직영점","short":"김인복의광평","cat":"한식-일반","menu":"평양냉면","desc":"평양냉면을 파는 곳","link":"https://naver.me/GwpMNV9z","addr":"서울 서초구 서운로 135","lat":37.495509,"lon":127.02453,"kx":505423,"ky":1110015,"exit":8,"exitM":320},{"id":45,"name":"이조불쭈꾸미","short":"이조불쭈꾸미","cat":"한식-일반","menu":"불쭈덮밥","desc":"쭈꾸미 덮밥!","link":"https://naver.me/Fr7xLvp9","addr":"서울 서초구 사임당로 175 1층 101~102호","lat":37.492887,"lon":127.028731,"kx":506351,"ky":1109288,"exit":5,"exitM":270},{"id":47,"name":"연돈튀김덮밥","short":"연돈튀김덮밥","cat":"분식","menu":"통등심돈까스제육","desc":"싸고 맛있게 한끼를 해결할 수 있어요!","link":"https://naver.me/xF4Xxfm9","addr":"서울 서초구 서초대로77길 3","lat":37.498059,"lon":127.0265,"kx":505858,"ky":1110722,"exit":9,"exitM":40},{"id":48,"name":"하나우동","short":"하나우동","cat":"분식","menu":"김치볶음","desc":"우동도 괜찮지만 김볶이 맛도리","link":"https://naver.me/FBe2cKkU","addr":"서울 서초구 서초대로78길 38 1층","lat":37.494491,"lon":127.028227,"kx":506239,"ky":1109732,"exit":5,"exitM":90},{"id":49,"name":"동대문엽기떡볶이 강남역점","short":"동대문엽기떡볶이","cat":"분식","menu":"2명이서 가면 베스트세트","desc":"엽떡 말해모해요! 근데 여기 이사했어요","link":"https://naver.me/Gxk1Yl4s","addr":"서울 서초구 강남대로55길 9-13 J타워 2층 201호","lat":37.494978,"lon":127.027831,"kx":506152,"ky":1109868,"exit":5,"exitM":80},{"id":50,"name":"153구포국수","short":"153구포국수","cat":"분식","menu":"비빔국수, 키토마요 김밥","desc":"체인점이지만..!! 분식이 먹고싶을 때!","link":"https://naver.me/GHvqnhhN","addr":"서울 강남구 테헤란로4길 6 지하1층 B102호","lat":37.497726,"lon":127.029303,"kx":506477,"ky":1110630,"exit":1,"exitM":60},{"id":52,"name":"오토김밥","short":"오토김밥","cat":"분식","menu":"오토닭강정 콤비세트","desc":"김밥과 닭강정","link":"https://naver.me/FMcgb6wg","addr":"서울 강남구 테헤란로4길 46 쌍용플레티넘밸류 1층","lat":37.495707,"lon":127.030656,"kx":506776,"ky":1110070,"exit":4,"exitM":140},{"id":53,"name":"고봉민김밥인","short":"고봉민김밥인","cat":"분식","menu":"참치김밥과 라면","desc":"김밥과 라면","link":"https://naver.me/5chu3HoE","addr":"서울 서초구 서초대로74길 49 아르누보씨티2 1층 104호","lat":37.493419,"lon":127.028006,"kx":506191,"ky":1109435,"exit":5,"exitM":210},{"id":54,"name":"아비꼬","short":"아비꼬","cat":"일식","menu":"허브치킨카레","desc":"일본식 카레집","link":"https://naver.me/FTXwj9dT","addr":"서울 서초구 서초대로78길 36 강남지웰타워 101호","lat":37.494752,"lon":127.028165,"kx":506226,"ky":1109805,"exit":5,"exitM":70},{"id":55,"name":"이태원천상","short":"이태원천상","cat":"일식","menu":"김치돈까스","desc":"가츠동, 에비동, 카레 등등","link":"https://naver.me/5xj2ED7A","addr":"서울 서초구 서초대로74길 23 트라펠리스 지하1층","lat":37.495653,"lon":127.0271,"kx":505991,"ky":1110055,"exit":6,"exitM":130},{"id":56,"name":"요기야","short":"요기야","cat":"일식","menu":"가츠동","desc":"돈카츠, 우동 등등","link":"https://naver.me/5yPsv8gz","addr":"서울 서초구 서초대로78길 30 1층 1호","lat":37.495113,"lon":127.027938,"kx":506176,"ky":1109905,"exit":5,"exitM":60},{"id":57,"name":"오양민돈까스","short":"오양민돈까스","cat":"일식","menu":"돈까스","desc":"돈가스, 소바","link":"https://naver.me/Gsj2XVG4","addr":"서울 서초구 서운로 138 1층 105호","lat":37.495991,"lon":127.025263,"kx":505585,"ky":1110149,"exit":8,"exitM":240},{"id":58,"name":"고메스시","short":"고메스시","cat":"일식","menu":"런치 초밥 세트!!!","desc":"[추천맛집] 런치 초밥세트 짱짱가성비","link":"https://naver.me/GI3J1SRa","addr":"서울 강남구 테헤란로1길 26 2층","lat":37.50001,"lon":127.027669,"kx":506116,"ky":1111264,"exit":11,"exitM":130},{"id":59,"name":"왓쇼이켄","short":"왓쇼이켄","cat":"일식","menu":"교카이 돈코츠라멘","desc":"거리는 좀 멀지만, 일본식 라멘집","link":"https://naver.me/5oE5CgOF","addr":"서울 강남구 테헤란로4길 46 지하1층 B120호","lat":37.495126,"lon":127.030296,"kx":506696,"ky":1109909,"exit":4,"exitM":120},{"id":60,"name":"우동명가기리야마본진","short":"우동명가기리야마본진","cat":"일식","menu":"런치스페셜","desc":"우동맛집","link":"https://naver.me/xY4sO6mN","addr":"서울 강남구 강남대로84길 23 한라클래식 1층","lat":37.497131,"lon":127.030384,"kx":506716,"ky":1110465,"exit":3,"exitM":170},{"id":61,"name":"오므토토마토","short":"오므토토마토","cat":"일식","menu":"가라아게오므라이스","desc":"오므라이스집!","link":"https://naver.me/FQVGFw5v","addr":"서울 강남구 테헤란로4길 29 정우씨티 1층 2호","lat":37.496527,"lon":127.030486,"kx":506738,"ky":1110298,"exit":4,"exitM":160},{"id":62,"name":"온센 강남점","short":"온센","cat":"일식","menu":"온센텐동","desc":"[추천맛집] 유명하고 맛있는 텐동집","link":"https://naver.me/GFB1lCRL","addr":"서울 서초구 서초대로73길 42 강남역리가스퀘어 1층","lat":37.501221,"lon":127.024451,"kx":505406,"ky":1111600,"exit":10,"exitM":360},{"id":64,"name":"철판목장","short":"철판목장","cat":"양식","menu":"오늘의 점심","desc":"스테이크집, 오늘의 점심은 합리적인 가격!","link":"https://naver.me/GPdoguEP","addr":"서울 서초구 서초대로74길 11 삼성전자빌딩 지하2층 B212호","lat":37.49664,"lon":127.026933,"kx":505954,"ky":1110329,"exit":7,"exitM":90},{"id":65,"name":"라그릴리아","short":"라그릴리아","cat":"양식","menu":"파스타","desc":"SPC에서 운영하는 레스토랑","link":"https://naver.me/GV2tG7XG","addr":"서울 강남구 강남대로 352 3층","lat":37.494369,"lon":127.029855,"kx":506599,"ky":1109699,"exit":5,"exitM":150},{"id":66,"name":"매드포갈릭","short":"매드포갈릭","cat":"양식","menu":"매드 런치","desc":"갈릭을 주제로 여러가지 메뉴가 있어요","link":"https://naver.me/GV2tmgaw","addr":"서울 서초구 서초대로74길 11 삼성전자빌딩 지하1층","lat":37.496595,"lon":127.026939,"kx":505955,"ky":1110316,"exit":6,"exitM":90},{"id":67,"name":"더블린브루어리 강남점","short":"더블린브루어리","cat":"저녁회식장소추천","menu":"시그니처 피자","desc":"맥주집 찾으세요? 요기 어떠세요","link":"https://naver.me/5pwsR1BD","addr":"서울 서초구 서초대로78길 26 2층","lat":37.495361,"lon":127.027732,"kx":506130,"ky":1109974,"exit":5,"exitM":80},{"id":68,"name":"파파이스","short":"파파이스","cat":"버거","menu":"통 스파이시 버거","desc":"추억의 파파이스","link":"https://naver.me/GkR3vbXv","addr":"서울 서초구 강남대로 341 삼원빌딩 1층","lat":37.493243,"lon":127.029339,"kx":506485,"ky":1109386,"exit":5,"exitM":240},{"id":69,"name":"쉐이크쉑 강남스퀘어점","short":"쉐이크쉑","cat":"버거","menu":"쉑버거","desc":"쉑쉑!","link":"https://naver.me/FXwGVl37","addr":"서울 강남구 강남대로 352 1층","lat":37.494379,"lon":127.029804,"kx":506588,"ky":1109701,"exit":5,"exitM":150},{"id":70,"name":"KFC 서초우성점","short":"KFC","cat":"버거","menu":"징거버거","desc":"켄터키 후라이드","link":"https://naver.me/FCA0d5hr","addr":"서울 서초구 사임당로 171 EWR빌딩 1층","lat":37.492667,"lon":127.028309,"kx":506258,"ky":1109226,"exit":5,"exitM":290},{"id":71,"name":"KFC 강남역","short":"KFC","cat":"버거","menu":"징거버거","desc":"켄터키 후라이드2","link":"https://naver.me/Fr7xddS1","addr":"서울 서초구 서초대로77길 15 1층","lat":37.49891,"lon":127.026095,"kx":505769,"ky":1110959,"exit":10,"exitM":90},{"id":72,"name":"맥도날드 강남2호점","short":"맥도날드","cat":"버거","menu":"개인취향에따라~","desc":"맥플러리가 맛있는 맥도날드","link":"https://naver.me/GyYr11KB","addr":"서울 강남구 테헤란로 107 메디타워 2층","lat":37.49864,"lon":127.028734,"kx":506351,"ky":1110884,"exit":12,"exitM":20},{"id":73,"name":"버거킹 강남대로점","short":"버거킹","cat":"버거","menu":"개취로는 몬스터와퍼","desc":"버거왕","link":"https://naver.me/GdymqQyp","addr":"서울 강남구 강남대로 406 글라스타워 1층","lat":37.498874,"lon":127.027522,"kx":506084,"ky":1110949,"exit":11,"exitM":10},{"id":74,"name":"보승회관 강남역서초점","short":"보승회관","cat":"한식-국물(찌개 포함)","menu":"수육국밥","desc":"순대국밥, 수육국밥집","link":"https://naver.me/FzSZ6SU4","addr":"서울 서초구 강남대로 359 대우도씨에빛2 1층 103호","lat":37.494901,"lon":127.028451,"kx":506289,"ky":1109846,"exit":5,"exitM":40},{"id":75,"name":"한성양꼬치 강남2호점","short":"한성양꼬치","cat":"중식","menu":"양꼬치","desc":"[추천맛집] 냄새없는 양꼬치 맛집!","link":"https://naver.me/FgHDJji1","addr":"서울 강남구 역삼로3길 14","lat":37.494469,"lon":127.031559,"kx":506975,"ky":1109726,"exit":4,"exitM":250}];
+const EXITS = [[1, 37.498079, 127.028764], [2, 37.497311, 127.02823], [3, 37.496763, 127.028502], [4, 37.495581, 127.029059], [5, 37.495286, 127.028606], [6, 37.496608, 127.027972], [7, 37.497178, 127.027686], [8, 37.497538, 127.027134], [9, 37.497971, 127.026885], [10, 37.498637, 127.026998], [11, 37.498836, 127.027505], [12, 37.498501, 127.028583]];
+const CATS = [
+  {k:'all', name:'전체', e:'⭐', c:'#3d7bff'},
+  {k:'한식-일반', name:'한식', e:'🍚', c:'#ff9f43'},
+  {k:'한식-국물(찌개 포함)', name:'국물·찌개', e:'🍲', c:'#e8743b'},
+  {k:'중식', name:'중식', e:'🥟', c:'#ef5b5b'},
+  {k:'일식', name:'일식', e:'🍣', c:'#4aa3ff'},
+  {k:'양식', name:'양식', e:'🍝', c:'#ff7aa8'},
+  {k:'분식', name:'분식', e:'🍢', c:'#e0a800'},
+  {k:'샐러드&샌드위치', name:'샐러드', e:'🥗', c:'#3cc47c'},
+  {k:'버거', name:'버거', e:'🍔', c:'#c98a4a'},
+  {k:'기타', name:'세계음식', e:'🌮', c:'#9b7bff'},
+  {k:'카페', name:'카페', e:'🍰', c:'#f08fc0'},
+  {k:'저녁회식장소추천', name:'회식', e:'🍻', c:'#7c8aa5'},
+];
+const CAT = Object.fromEntries(CATS.map(c=>[c.k,c]));
+const catOf = d => CAT[d.cat]||CAT['기타'];
+const M_LAT=110990, M_LON=88320;
+const xy = (lat,lon)=>({x:(lon-HQ.lon)*M_LON, y:-(lat-HQ.lat)*M_LAT});
+DATA.forEach(d=>{ const p=xy(d.lat,d.lon); d.x=p.x; d.y=p.y; d.dist=Math.hypot(p.x,p.y); d.min=Math.max(1,Math.round(d.dist*1.3/67)); });
+const BYID = Object.fromEntries(DATA.map(d=>[d.id,d]));
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mapEl=$('#map'), layer=$('#layer'), roads=$('#roads'), routeSvg=$('#routeSvg');
+let view={s:1.25,tx:0,ty:0};
+let state={tab:'map', cat:null, q:'', sel:null, tags:true}; let curIdx=0, curList=[];
+const pins={};
+
+/* ================= MAP ================= */
+function line(pts,w,name,np){
+  const d=pts.map((p,i)=>{const q=xy(p[0],p[1]);return (i?'L':'M')+q.x.toFixed(1)+' '+q.y.toFixed(1)}).join(' ');
+  let s=`<path d="${d}" stroke="var(--roadEdge)" stroke-width="${w+8}" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" stroke="var(--road)" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if(name){const q=xy(np[0],np[1]); s+=`<text class="roadname" x="${q.x}" y="${q.y}" text-anchor="middle" transform="rotate(${np[2]} ${q.x} ${q.y})">${name}</text>`;}
+  return s;
+}
+function blob(lat,lon,rx,ry,rot,fill){const q=xy(lat,lon);return `<ellipse cx="${q.x}" cy="${q.y}" rx="${rx}" ry="${ry}" transform="rotate(${rot} ${q.x} ${q.y})" fill="${fill}"/>`}
+function drawRoads(){
+  const ST=[37.498086,127.028004]; let s='';
+  [[37.4995,127.0245,90,60,-20],[37.4950,127.0270,110,70,-15],[37.5005,127.0300,90,55,20],[37.4960,127.0310,120,70,-10],[37.4985,127.0230,70,50,-25],[37.4940,127.0240,90,55,-20],[37.5015,127.0260,80,50,15],[37.4975,127.0330,100,60,10]]
+    .forEach(b=>s+=blob(b[0],b[1],b[2],b[3],b[4],'var(--block)'));
+  s+=blob(37.4932,127.0292,70,40,-15,'var(--park)')+blob(37.5010,127.0222,55,34,-20,'var(--park)');
+  s+=line([[37.5070,127.0243],ST,[37.4900,127.0315]],34,'강남대로',[37.4935,127.0298,-62]);
+  s+=line([[37.4935,127.0170],[37.49663,127.02510],ST],30,'서초대로',[37.4950,127.0208,-25]);
+  s+=line([ST,[37.5006,127.0364],[37.5030,127.0450]],32,'테헤란로',[37.4993,127.0325,-17]);
+  s+=line([[37.4920,127.0255],[37.4985,127.0283]],14)+line([[37.4955,127.0225],[37.5002,127.0250]],12)+line([[37.4975,127.0215],[37.4945,127.0270]],12);
+  roads.innerHTML=s; roads.setAttribute('width',1); roads.setAttribute('height',1);
+  const st=xy(ST[0],ST[1]); const el=document.createElement('div'); el.className='station'; el.textContent='🚇 강남역';
+  el.style.left=st.x+'px'; el.style.top=st.y+'px'; layer.appendChild(el);
+  EXITS.forEach(([n,lat,lon])=>{ const q=xy(lat,lon); const m=document.createElement('div'); m.className='exitMark'+(n===8?' hq8':'');
+    m.innerHTML=`<b>${n}</b>번 출구`; m.title=`강남역 ${n}번 출구`; m.style.left=q.x+'px'; m.style.top=q.y+'px'; layer.appendChild(m); });
+}
+function building(){return `<svg width="74" height="86" viewBox="0 0 74 86" aria-hidden="true"><ellipse cx="37" cy="80" rx="30" ry="6" fill="rgba(40,70,120,.18)"/><rect x="12" y="10" width="50" height="70" rx="12" fill="#ffffff" stroke="#ff7aa8" stroke-width="4"/><rect x="12" y="10" width="50" height="16" rx="10" fill="#ff7aa8"/><g fill="#bfe0ff">${[0,1,2,3].map(r=>[0,1,2].map(c=>`<rect x="${20+c*12}" y="${32+r*10}" width="8" height="6" rx="2"/>`).join('')).join('')}</g><rect x="31" y="66" width="12" height="14" rx="4" fill="#ffd1e1"/><text x="37" y="22" text-anchor="middle" font-family="Jua,sans-serif" font-size="10" fill="#fff">GRATZ</text></svg>`}
+function buildPins(){
+  DATA.forEach(d=>{ const c=catOf(d);
+    const b=document.createElement('button'); b.className='pin'; b.style.setProperty('--c',c.c);
+    b.style.left=d.x+'px'; b.style.top=d.y+'px'; b.setAttribute('aria-label',d.name);
+    b.innerHTML=`<span class="bub">${c.e}</span><span class="tag">${esc(d.short)}</span>`;
+    b.addEventListener('click',e=>{e.stopPropagation(); select(d.id,true);});
+    layer.appendChild(b); pins[d.id]=b; });
+  const hq=document.createElement('button'); hq.className='hq'; hq.setAttribute('aria-label','우리 회사 그레이츠강남 14층');
+  hq.innerHTML=`<span class="ring"></span><span class="label">우리 회사 · 14층</span>${building()}`;
+  hq.addEventListener('click',e=>{e.stopPropagation(); goHome();}); layer.appendChild(hq);
+}
+function apply(){
+  layer.style.transform=`translate(${view.tx}px,${view.ty}px) scale(${view.s})`;
+  const inv=1/view.s;
+  layer.querySelectorAll('.pin').forEach(p=>{p.style.transform=`translate(-50%,-100%) scale(${inv})`;p.style.transformOrigin='50% 100%'});
+  layer.querySelectorAll('.hq').forEach(p=>{p.style.transform=`translate(-50%,-92%) scale(${inv})`;p.style.transformOrigin='50% 100%'});
+  layer.querySelectorAll('.station,.exitMark').forEach(p=>{p.style.transform=`translate(-50%,-50%) scale(${inv})`});
+  roads.querySelectorAll('.roadname').forEach(t=>t.style.fontSize=(12*inv)+'px');
+  mapEl.classList.toggle('hideTags',!state.tags||view.s<0.9);
+  routeSvg.style.setProperty('--w',inv);
+  routeSvg.querySelectorAll('[data-sw]').forEach(p=>p.setAttribute('stroke-width',(+p.dataset.sw)*inv));
+  routeSvg.style.setProperty('--gap',(22*inv)+'px'); routeSvg.style.setProperty('--dash',`${2*inv} ${10*inv}`);
+  routeSvg.querySelectorAll('.rflow').forEach(p=>p.setAttribute('stroke-dasharray',`${2*inv} ${20*inv}`));
+  routeSvg.querySelectorAll('.rguess').forEach(p=>p.setAttribute('stroke-dasharray',`${12*inv} ${10*inv}`));
+}
+function centerOn(x,y,s){const r=mapEl.getBoundingClientRect(); if(s) view.s=s; view.tx=r.width/2-x*view.s; view.ty=r.height*0.46-y*view.s; apply();}
+function zoomAt(f,cx,cy){const r=mapEl.getBoundingClientRect(); cx??=r.width/2; cy??=r.height/2; const ns=Math.min(4,Math.max(0.35,view.s*f)); const k=ns/view.s; view.tx=cx-(cx-view.tx)*k; view.ty=cy-(cy-view.ty)*k; view.s=ns; apply();}
+function fly(x,y,s){layer.style.transition='transform .45s cubic-bezier(.3,1.2,.5,1)'; centerOn(x,y,s); setTimeout(()=>layer.style.transition='',460);}
+function goHome(){fly(0,0,1.25)}
+const pts=new Map(); let moved=0;
+mapEl.addEventListener('pointerdown',e=>{ if(e.target.closest('.pin,.hq')) return; mapEl.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=0; mapEl.classList.add('drag'); });
+mapEl.addEventListener('pointermove',e=>{ if(!pts.has(e.pointerId)) return; const p=pts.get(e.pointerId);
+  if(pts.size===1){ view.tx+=e.clientX-p.x; view.ty+=e.clientY-p.y; moved+=Math.abs(e.clientX-p.x)+Math.abs(e.clientY-p.y); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); apply(); }
+  else { const o=[...pts.entries()].find(([id])=>id!==e.pointerId)[1]; const d0=Math.hypot(p.x-o.x,p.y-o.y); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); const d1=Math.hypot(e.clientX-o.x,e.clientY-o.y); const r=mapEl.getBoundingClientRect(); if(d0>0) zoomAt(d1/d0,(e.clientX+o.x)/2-r.left,(e.clientY+o.y)/2-r.top); moved+=99; } });
+const up=e=>{pts.delete(e.pointerId); if(!pts.size) mapEl.classList.remove('drag');};
+mapEl.addEventListener('pointerup',e=>{up(e); if(moved<6&&!e.target.closest('.pin,.hq')) select(null);});
+mapEl.addEventListener('pointercancel',up);
+mapEl.addEventListener('wheel',e=>{e.preventDefault(); const r=mapEl.getBoundingClientRect(); zoomAt(e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top);},{passive:false});
+$('#zin').onclick=()=>zoomAt(1.3); $('#zout').onclick=()=>zoomAt(1/1.3); $('#home').onclick=()=>{clearRoute(); goHome();};
+$('#tagBtn').onclick=()=>{state.tags=!state.tags; apply();};
+
+function visible(){const q=state.q.trim().toLowerCase();
+  if(state.cat==null && !q) return [];
+  return DATA.filter(d=>(state.cat==null||state.cat==='all'||d.cat===state.cat)&&(!q||(d.name+d.menu+d.desc+catOf(d).name).toLowerCase().includes(q))).sort((a,b)=>a.dist-b.dist);}
+function renderChips(){
+  $('#chips').innerHTML=CATS.map(c=>{const n=c.k==='all'?DATA.length:DATA.filter(d=>d.cat===c.k).length; if(!n) return '';
+    return `<button class="chip" data-k="${c.k}" aria-pressed="${state.cat===c.k}" style="--chipOn:${c.k==='all'?'var(--ink)':c.c}"><span class="e">${c.e}</span>${c.name}<span class="n">${n}</span></button>`}).join('');
+  $('#chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ clearRoute(); state.cat=(state.cat===b.dataset.k)?null:b.dataset.k; state.sel=null; renderChips(); refreshMap(true);});
+}
+const exitHTML=d=>`<span class="exitTag">🚇 강남역 <span class="no">${d.exit}</span>번 출구<small>· 약 ${d.exitM}m</small></span>`;
+function cardHTML(d){const c=catOf(d);
+  return `<div class="card${state.sel===d.id?' on':''}" data-id="${d.id}" style="--c:${c.c};--cbg:color-mix(in srgb,${c.c} 18%,transparent)">
+   <div class="crow"><div class="cico">${c.e}</div><div style="min-width:0"><div class="cname">${esc(d.name)}</div><div class="cmeta"><span>${c.name}</span><span class="dot">·</span><span>🚶 (회사 기준 도보) ${d.min}분</span></div><div class="cmeta"><span class="ex">🚇 강남역 ${d.exit}번 출구에서 ${d.exitM}m</span></div></div></div>
+   <div class="menu"><b>추천</b>${esc(d.menu)}</div>${d.desc?`<div class="desc">${esc(d.desc)}</div>`:''}
+   <div class="cfoot"><a class="pill route-btn" href="${kakaoWalk(d)}" target="_blank" rel="noopener"><span class="pi">🧭</span>길안내</a></div></div>`;}
+function refreshMap(fit){
+  const v=visible(), ids=new Set(v.map(d=>d.id)); curList=v; curIdx=0;
+  DATA.forEach(d=>{pins[d.id].classList.toggle('hide',!ids.has(d.id)); pins[d.id].classList.toggle('on',state.sel===d.id);});
+  const cards=$('#cards'); const idle=state.cat==null && !state.q.trim();
+  cards.classList.toggle('solo', idle || !v.length);
+  if(idle) cards.innerHTML=`<div class="card hint"><div class="big">🏢</div><div class="cname">우리 회사에서 출발!</div><div class="ccat">그레이츠강남 14층 · 🚇 강남역 8번 출구 쪽</div><div class="desc">위에서 먹고 싶은 메뉴를 누르면 회사 근처 맛집이 지도에 나타나요.</div></div>`;
+  else if(!v.length) cards.innerHTML=`<div class="card hint"><div class="big">🔍</div><div class="cname">검색 결과가 없어요</div><div class="desc">다른 메뉴 이름으로 찾아보세요.</div></div>`;
+  else cards.innerHTML=v.map(cardHTML).join('');
+  cards.querySelectorAll('.card[data-id]').forEach(el=>el.onclick=e=>{if(e.target.closest('a')) return; goCard(curList.findIndex(d=>d.id===+el.dataset.id));});
+  cards.scrollLeft=0;
+  $('#cnav').hidden=v.length<1||state.tab!=='map'; updateNav();
+  placeFab();
+  if(fit){ if(v.length) fitPoints([{x:0,y:0},...v.map(d=>({x:d.x,y:d.y}))]); else goHome(); }
+}
+function updateNav(){
+  const n=curList.length; $('#counter').innerHTML=n?`${curIdx+1} <small>/ ${n}</small>`:'';
+  $('#prevCard').disabled=curIdx<=0; $('#nextCard').disabled=curIdx>=n-1;
+}
+function goCard(i){
+  if(!curList.length) return; curIdx=Math.max(0,Math.min(curList.length-1,i)); updateNav();
+  select(curList[curIdx].id,true);
+}
+$('#prevCard').onclick=()=>goCard(curIdx-1);
+$('#nextCard').onclick=()=>goCard(curIdx+1);
+let scrollT; $('#cards').addEventListener('scroll',()=>{ clearTimeout(scrollT); scrollT=setTimeout(()=>{
+  const cs=[...$('#cards').querySelectorAll('.card[data-id]')]; if(!cs.length) return;
+  const mid=$('#cards').getBoundingClientRect().left+$('#cards').clientWidth/2;
+  let bi=0,bd=1e9; cs.forEach((c,i)=>{const r=c.getBoundingClientRect(); const dd=Math.abs(r.left+r.width/2-mid); if(dd<bd){bd=dd;bi=i;}});
+  if(bi!==curIdx){ curIdx=bi; updateNav(); const id=curList[bi].id; state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id)); cs.forEach(c=>c.classList.toggle('on',+c.dataset.id===id)); }
+},140); },{passive:true});
+document.addEventListener('keydown',e=>{ if(state.tab!=='map'||e.target.matches('input')) return; if(e.key==='ArrowRight') goCard(curIdx+1); if(e.key==='ArrowLeft') goCard(curIdx-1); });
+function placeFab(){$('#fab').style.bottom=($('.sheet').offsetHeight+12)+'px';}
+function select(id,go){
+  state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id));
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('on',+c.dataset.id===id));
+  if(id==null) return; const d=BYID[id];
+  const li=curList.findIndex(x=>x.id===id); if(li>=0 && li!==curIdx){ curIdx=li; updateNav(); }
+  if(go) fly(d.x,d.y,Math.max(view.s,1.25));
+  document.querySelector(`.card[data-id="${id}"]`)?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+$('#q').addEventListener('input',e=>{ clearRoute(); state.q=e.target.value; state.sel=null; refreshMap(true);});
+function showOnMap(id){ clearRoute(); state.cat=BYID[id]?.cat||'all'; state.q=''; $('#q').value=''; renderChips(); setTab('map'); refreshMap(); requestAnimationFrame(()=>select(id,true)); }
+
+/* ================= ROUTE ================= */
+let routeId=null;
+const kakaoWalk=d=>`https://map.kakao.com/?target=walk&rt=${HQ.kx},${HQ.ky},${d.kx},${d.ky}&rt1=${encodeURIComponent('그레이츠강남')}&rt2=${encodeURIComponent(d.name)}`;
+function routePoints(d){
+  const mid=(d.route||[]).map(p=>xy(p[0],p[1]));
+  return [{x:0,y:0},...mid,{x:d.x,y:d.y}];
+}
+function showRoute(id){
+  const d=BYID[id]; if(!d) return; routeId=id;
+  const P=routePoints(d); const real=!!(d.route&&d.route.length);
+  const dstr=P.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+  routeSvg.innerHTML=`<path class="rcase" data-sw="13" d="${dstr}"/><path class="rline${real?'':' rguess'}" data-sw="7" d="${dstr}"/>${real?`<path class="rflow" data-sw="3" d="${dstr}"/>`:''}`;
+  const c=catOf(d);
+  const len=real?d.rlen:Math.round(d.dist*1.3), min=real?Math.max(1,Math.round(d.rtime/60)):d.min;
+  $('#routeBar').innerHTML=`<div class="rb1"><div class="ic">${c.e}</div><div class="tt">${esc(d.name)}<small>🏢 회사 → ${esc(d.short)} · 🚇 강남역 ${d.exit}번 출구 근처</small></div><button class="x" id="routeClose" aria-label="길안내 닫기">✕</button></div>
+    <div class="rb2"><span class="big">🚶 ${min}분</span><span class="sub">${real?'':'약 '}${len}m</span></div>
+    <div class="rbMaps"><a class="kakao" href="${kakaoWalk(d)}" target="_blank" rel="noopener"><span class="mk">K</span>카카오맵 길찾기</a><a class="place" href="${esc(d.link)}" target="_blank" rel="noopener">📍 장소보기</a></div>
+    <div class="rnote">${real?'초록 선은 카카오맵 도보 경로 기준이에요.':'점선은 방향만 보여줘요. 자세한 길은 카카오맵 길찾기에서 확인하세요.'}</div>`;
+  $('#routeBar').hidden=false; $('#mapTop').hidden=true;
+  $('#routeClose').onclick=clearRoute;
+  select(id,false); fitRoute(P); apply();
+}
+function clearRoute(){ routeId=null; routeSvg.innerHTML=''; $('#routeBar').hidden=true; if(state.tab==='map') $('#mapTop').hidden=false; }
+function fitPoints(P){ fitRoute(P); }
+function fitRoute(P){
+  const r=mapEl.getBoundingClientRect(); const top=($('#routeBar').hidden?$('#mapTop').offsetHeight:$('#routeBar').offsetHeight)+30, bottom=$('.sheet').offsetHeight+30, side=50;
+  const xs=P.map(p=>p.x), ys=P.map(p=>p.y); const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  const s=Math.min(2.2,Math.max(0.45,Math.min((r.width-side*2)/Math.max(60,maxX-minX),(r.height-top-bottom)/Math.max(60,maxY-minY))));
+  layer.style.transition='transform .5s cubic-bezier(.3,1.2,.5,1)';
+  view.s=s; view.tx=r.width/2-(minX+maxX)/2*s; view.ty=top+(r.height-top-bottom)/2-(minY+maxY)/2*s; apply();
+  setTimeout(()=>layer.style.transition='',520);
+}
+
+/* ================= TABS ================= */
+function setTab(t){
+  state.tab=t;
+  document.querySelectorAll('.bbtn').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+  const isMap=t==='map';
+  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
+  $('#pickPanel').hidden=t!=='pick'; $('#meetPanel').hidden=t!=='meet';
+  if(isMap) placeFab();
+  if(t==='meet') meetInit();
+}
+document.querySelectorAll('.bbtn').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+
+/* ================= PICK ================= */
+const pick={w:10, cats:new Set(), last:null, spinning:false};
+function pickPool(){return DATA.filter(d=>d.min<=pick.w && (!pick.cats.size||pick.cats.has(d.cat)));}
+function renderPick(){
+  $('#pickChips').innerHTML=CATS.filter(c=>c.k!=='all').map(c=>`<button class="chip" data-k="${c.k}" aria-pressed="${pick.cats.has(c.k)}" style="--chipOn:${c.c}"><span class="e">${c.e}</span>${c.name}</button>`).join('');
+  $('#pickChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k; pick.cats.has(k)?pick.cats.delete(k):pick.cats.add(k); renderPick();});
+  document.querySelectorAll('#walkSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.w===pick.w));
+  const n=pickPool().length;
+  $('#pickCount').textContent=n?`조건에 맞는 맛집 ${n}곳 중에서 골라요`:'조건에 맞는 맛집이 없어요. 걷는 시간을 늘리거나 메뉴를 바꿔보세요.';
+  $('#spinBtn').disabled=!n||pick.spinning;
+}
+document.querySelectorAll('#walkSeg button').forEach(b=>b.onclick=()=>{pick.w=+b.dataset.w; renderPick();});
+function showPick(d,final){
+  const c=catOf(d); $('#slot').style.setProperty('--sc',c.c);
+  $('#sFace').textContent=c.e; $('#sCat').textContent=`${c.name} · 🚶 (회사 기준 도보) ${d.min}분 · 🚇 ${d.exit}번 출구에서 ${d.exitM}m`; $('#sName').textContent=d.name;
+  if(final){ $('#sBody').className=''; $('#sBody').innerHTML=`<div class="menu"><b>추천</b>${esc(d.menu)}</div>${d.desc?`<div class="desc" style="margin-top:8px">${esc(d.desc)}</div>`:''}`; }
+}
+$('#spinBtn').onclick=()=>{
+  const pool=pickPool(); if(!pool.length||pick.spinning) return;
+  pick.spinning=true; renderPick(); $('#sActions').hidden=true;
+  const slot=$('#slot'); slot.classList.remove('done'); slot.classList.add('spin');
+  $('#sBody').className='hint'; $('#sBody').textContent='두구두구두구…';
+  let choice; do{choice=pool[Math.floor(Math.random()*pool.length)]}while(pool.length>1&&choice===pick.last);
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i=0, steps=reduce?1:18;
+  const tick=()=>{ i++;
+    if(i<steps){ showPick(pool[Math.floor(Math.random()*pool.length)],false); setTimeout(tick,50+i*i*1.2); }
+    else { pick.last=choice; showPick(choice,true); slot.classList.remove('spin'); void slot.offsetWidth; slot.classList.add('done');
+      $('#sActions').hidden=false; $('#sMap').href=kakaoWalk(choice); $('#spinBtn').textContent='다시 돌리기'; pick.spinning=false; renderPick(); } };
+  tick();
+};
+
+
+/* ================= MEET (shared via db) ================= */
+const meet={db:null,user:null,uid:null,canWrite:null,canAdmin:false,ready:false,started:false,signups:[],rounds:{},profiles:{},err:'',busy:false,prefs:new Set(),team:''};
+const DOW='일월화수목금토';
+function nextFriday(){const d=new Date(); let add=(5-d.getDay()+7)%7; if(add===0) add=7; d.setDate(d.getDate()+add); return d;}
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function currentRound(){ return meet.rounds.current?.date || ymd(nextFriday()); }
+function renderHero(){
+  const r=currentRound(); const d=new Date(r+'T12:00:00');
+  $('#calM').textContent=(d.getMonth()+1)+'월'; $('#calD').textContent=d.getDate(); $('#calW').textContent=DOW[d.getDay()]+'요일';
+  $('#whenT').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]}) 런치밋`;
+  const list=meet.signups.filter(s=>s.round===r); const teams=new Set(list.map(s=>s.team));
+  $('#stN').textContent=list.length; $('#stT').textContent=teams.size; $('#stG').textContent=list.length>=2?Math.max(1,Math.round(list.length/4))+'개':'-';
+}
+async function meetInit(){
+  renderHero(); renderMeet();
+  if(meet.started) return; meet.started=true;
+  if(!window.claude?.use){ meet.ready=true; meet.err='offline'; renderMeet(); return; }
+  try{
+    const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);
+    meet.db=db; meet.user=user;
+    if(user){ meet.uid=await user.id(); meet.canWrite=await user.can('data.write'); meet.canAdmin=await user.canEdit(); }
+    if(!db){ meet.ready=true; meet.err='offline'; renderMeet(); return; }
+    db.collection('lunchmeet').onSnapshot(s=>{ meet.signups=s.docs.map(d=>({id:d.id,...d.data()})); meet.ready=true; renderHero(); renderMeet(); },
+      e=>{ meet.err='load'; renderMeet(); });
+    db.collection('rounds').onSnapshot(s=>{ meet.rounds=Object.fromEntries(s.docs.map(d=>[d.id,d.data()])); renderHero(); renderMeet(); }, ()=>{});
+  }catch(e){ meet.ready=true; meet.err='offline'; renderMeet(); }
+}
+async function resolveNames(ids){ if(!meet.user||!ids.length) return {}; try{ return await meet.user.profiles(ids); }catch(e){ return {}; } }
+function personHTML(uid,team,ps){ const p=ps[uid]||{}; const nm=p.name||(uid===meet.uid?'나':'동료');
+  return `<span class="person">${p.avatarUrl?`<img src="${esc(p.avatarUrl)}" alt="">`:''}<span class="nm">${esc(nm)}${uid===meet.uid?' (나)':''}</span><span class="tm">${esc(team)}</span></span>`; }
+let renderSeq=0;
+async function renderMeet(){
+  const seq=++renderSeq; const box=$('#meetBody');
+  if(!meet.ready){ box.innerHTML=`<div class="box"><div class="msg">신청 현황을 불러오는 중이에요…</div></div>`; return; }
+  if(meet.err==='offline'){ box.innerHTML=`<div class="notice">런치밋 신청은 슬랙에서 할 수 있어요. 아무 채널이나 DM 창에 <b>/lunchmeet</b> 을 입력해 신청하고, 조 편성 결과도 슬랙으로 받아보세요.</div>`; return; }
+  const r=currentRound(); const list=meet.signups.filter(s=>s.round===r);
+  const mine=list.find(s=>s.id===meet.uid); const res=meet.rounds['r-'+r];
+  const ps=await resolveNames([...new Set([...list.map(s=>s.id), ...(res?res.groups.flatMap(g=>g.members):[])])]);
+  if(seq!==renderSeq) return;
+  const knownTeams=[...new Set(meet.signups.map(s=>s.team).filter(Boolean))].slice(0,12);
+  let h='';
+  // result
+  if(res){
+    const myIdx=res.groups.findIndex(g=>g.members.includes(meet.uid));
+    h+=`<div class="box"><div class="lbl">🎉 매칭 결과 <small>${res.groups.length}개 조</small></div>`+
+      res.groups.map((g,i)=>{const p=BYID[g.place]; const c=p?catOf(p):null; const teamOf=id=>(list.find(s=>s.id===id)||{}).team||'';
+        return `<div class="group${i===myIdx?' mine':''}"><div class="ghead"><span class="gno">${i+1}조</span>${i===myIdx?'<span class="gmine">우리 조</span>':''}</div>
+        <div class="people">${g.members.map(id=>personHTML(id,teamOf(id),ps)).join('')}</div>
+        ${p?`<button class="gplace" data-place="${p.id}"><span class="cico" style="background:color-mix(in srgb,${c.c} 18%,transparent)">${c.e}</span><span style="flex:1;min-width:0"><span class="nm">${esc(p.name)}</span><br><span class="mn">${esc(p.menu)} · 🚶 ${p.min}분</span></span><span class="walk">지도 ›</span></button>`:''}</div>`}).join('')+`</div>`;
+  }
+  // my status
+  if(!meet.uid){
+    h+=`<div class="notice">로그인 정보가 확인되지 않아 신청할 수 없어요. claude.ai에 로그인한 상태로 열어주세요.</div>`;
+  } else if(mine){
+    h+=`<div class="box"><div class="joined"><div class="badge">🙌</div><div style="flex:1;min-width:0"><div class="t">신청 완료!</div><div class="s">${esc(mine.team)}${mine.prefs?.length?' · 선호 '+mine.prefs.map(k=>CAT[k]?.name||k).join(', '):''}</div></div>
+      ${res?'':'<button class="linkBtn" id="cancelBtn">신청 취소</button>'}</div>
+      <div class="msg">${res?'조 편성이 끝났어요. 위에서 우리 조를 확인하세요.':'조 편성이 끝나면 이 화면에 우리 조와 식당이 표시돼요.'}</div></div>`;
+  } else if(res){
+    h+=`<div class="notice">이번 회차는 조 편성이 끝났어요. 다음 회차에 신청해 주세요!</div>`;
+  } else if(meet.canWrite===false){
+    h+=`<div class="notice">지금 권한으로는 신청할 수 없어요. 페이지 주인에게 '참여자' 권한을 요청해 주세요.</div>`;
+  } else {
+    h+=`<div class="box">
+      <div class="field"><label class="lbl" for="teamIn">👥 소속 팀</label><input id="teamIn" maxlength="20" placeholder="예: 인사팀" value="${esc(meet.team)}" autocomplete="off">
+      ${knownTeams.length?`<div class="teams">${knownTeams.map(t=>`<button data-team="${esc(t)}">${esc(t)}</button>`).join('')}</div>`:''}</div>
+      <div class="lbl">😋 이런 메뉴면 좋겠어요 <small>선택 · 최대 3개</small></div>
+      <div class="chips wrap" id="prefChips">${CATS.filter(c=>c.k!=='all'&&c.k!=='카페'&&c.k!=='저녁회식장소추천').map(c=>`<button class="chip" data-k="${c.k}" aria-pressed="${meet.prefs.has(c.k)}" style="--chipOn:${c.c}"><span class="e">${c.e}</span>${c.name}</button>`).join('')}</div>
+      <button class="joinBtn" id="joinBtn" ${meet.busy?'disabled':''}>참여 신청하기</button>
+      <div class="msg${meet.err==='write'?' err':''}" id="joinMsg">${meet.err==='write'?'신청을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.':'같은 팀끼리는 되도록 다른 조로 나눠져요.'}</div></div>`;
+  }
+  // participants
+  h+=`<div class="box"><div class="lbl">🙋 신청한 동료 <small>${list.length}명</small></div>`+
+     (list.length?`<div class="people">${list.map(s=>personHTML(s.id,s.team,ps)).join('')}</div>`:`<div class="msg">아직 신청한 사람이 없어요. 첫 번째로 신청해 보세요!</div>`)+`</div>`;
+  // admin
+  if(meet.canAdmin){
+    h+=`<div class="admin"><div class="lbl">🛠️ 운영자 메뉴 <small>편집 권한이 있는 사람에게만 보여요</small></div>
+      <div class="arow"><input type="date" id="roundIn" value="${r}" aria-label="회차 날짜"><button class="abtn soft" id="roundBtn">회차 날짜 저장</button></div>
+      <div class="arow">${res?`<button class="abtn" id="matchBtn">다시 섞기</button><button class="abtn warn" id="clearBtn">결과 지우기</button>`:`<button class="abtn" id="matchBtn" ${list.length<2?'disabled':''}>조 편성하기 (${list.length}명)</button>`}</div>
+      <div class="msg" id="adminMsg">${list.length<2?'2명 이상 신청하면 조를 편성할 수 있어요.':'다른 팀끼리 섞이도록 3~4명씩 나누고, 조원 선호 메뉴에 맞춰 걸어서 10분 이내 식당을 골라요.'}</div></div>`;
+  }
+  box.innerHTML=h;
+  // wire
+  box.querySelectorAll('.gplace').forEach(b=>b.onclick=()=>showOnMap(+b.dataset.place));
+  const ti=$('#teamIn'); if(ti) ti.oninput=e=>{meet.team=e.target.value};
+  box.querySelectorAll('.teams button').forEach(b=>b.onclick=()=>{meet.team=b.dataset.team; ti.value=meet.team;});
+  box.querySelectorAll('#prefChips .chip').forEach(b=>b.onclick=()=>{const k=b.dataset.k; if(meet.prefs.has(k)) meet.prefs.delete(k); else if(meet.prefs.size<3) meet.prefs.add(k); b.setAttribute('aria-pressed',meet.prefs.has(k)); box.querySelectorAll('#prefChips .chip').forEach(x=>x.setAttribute('aria-pressed',meet.prefs.has(x.dataset.k)));});
+  $('#joinBtn')&&($('#joinBtn').onclick=join);
+  $('#cancelBtn')&&($('#cancelBtn').onclick=cancel);
+  $('#roundBtn')&&($('#roundBtn').onclick=saveRound);
+  $('#matchBtn')&&($('#matchBtn').onclick=runMatch);
+  $('#clearBtn')&&($('#clearBtn').onclick=clearMatch);
+}
+async function join(){
+  const team=(meet.team||'').trim(); if(!team){ $('#joinMsg').textContent='소속 팀을 적어주세요.'; $('#joinMsg').className='msg err'; $('#teamIn').focus(); return; }
+  meet.busy=true; meet.err=''; renderMeet();
+  try{ await meet.db.doc('lunchmeet/'+meet.uid).set({round:currentRound(),team,prefs:[...meet.prefs],at:new Date().toISOString()}); }
+  catch(e){ meet.err='write'; if(e?.code==='invalid_argument') meet.canWrite=false; }
+  meet.busy=false; renderMeet();
+}
+async function cancel(){ try{ await meet.db.doc('lunchmeet/'+meet.uid).delete(); }catch(e){} }
+function adminMsg(t,err){const m=$('#adminMsg'); if(m){m.textContent=t; m.className='msg'+(err?' err':'');}}
+async function saveRound(){ const v=$('#roundIn').value; if(!v) return;
+  try{ await meet.db.doc('rounds/current').set({date:v}); adminMsg('회차 날짜를 저장했어요.'); }catch(e){ adminMsg('저장하지 못했어요. 편집 권한을 확인해 주세요.',true); } }
+function shuffle(a){a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
+function makeGroups(list){
+  const n=list.length, g=Math.max(1,Math.round(n/4));
+  const byTeam={}; shuffle(list).forEach(s=>(byTeam[s.team]??=[]).push(s));
+  const order=Object.values(byTeam).sort((a,b)=>b.length-a.length).flat();
+  const groups=Array.from({length:g},()=>[]);
+  order.forEach((s,i)=>groups[i%g].push(s));
+  const used=new Set();
+  return groups.map(m=>{ const prefs=new Set(m.flatMap(s=>s.prefs||[]));
+    let pool=DATA.filter(d=>d.min<=10 && d.cat!=='카페' && d.cat!=='저녁회식장소추천' && !used.has(d.id));
+    const pref=pool.filter(d=>prefs.has(d.cat)); if(pref.length) pool=pref;
+    const p=pool[Math.floor(Math.random()*pool.length)]; if(p) used.add(p.id);
+    return {members:m.map(s=>s.id), place:p?p.id:null}; });
+}
+async function runMatch(){
+  const r=currentRound(); const list=meet.signups.filter(s=>s.round===r); if(list.length<2) return;
+  try{ await meet.db.doc('rounds/r-'+r).set({date:r,groups:makeGroups(list),at:new Date().toISOString()}); adminMsg('조 편성을 마쳤어요.'); }
+  catch(e){ adminMsg('저장하지 못했어요. 편집 권한을 확인해 주세요.',true); }
+}
+let clearArm=false;
+async function clearMatch(){
+  const b=$('#clearBtn'); if(!clearArm){ clearArm=true; b.textContent='한 번 더 누르면 지워져요'; setTimeout(()=>{clearArm=false; if(b.isConnected) b.textContent='결과 지우기';},3000); return; }
+  clearArm=false; try{ await meet.db.doc('rounds/r-'+currentRound()).delete(); adminMsg('결과를 지웠어요.'); }catch(e){ adminMsg('지우지 못했어요.',true); }
+}
+
+/* ================= BOOT ================= */
+drawRoads(); buildPins(); renderChips(); refreshMap(); renderPick(); centerOn(0,0,1.25);
+// 첫 화면은 언제나 지도 탭 + 회사 중심
+setTab('map'); centerOn(0,0,1.25);
+requestAnimationFrame(()=>centerOn(0,0,1.25));
+addEventListener('load',()=>{ if(routeId==null && state.sel==null) centerOn(0,0,1.25); });
+addEventListener('resize',placeFab);
+</script>
+
+</body>
+</html>
