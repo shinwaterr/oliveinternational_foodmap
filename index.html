@@ -278,6 +278,10 @@ body{background:var(--grass)}
 .slot{background:linear-gradient(160deg,#fff4dc,#ffe9e4);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
 .spinBtn{background:var(--mint);box-shadow:0 5px 0 #3f8f48}
 .ghost{border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow)}
+.chipWrap{position:relative}
+.chipNav{position:absolute;top:calc(50% - 4px);transform:translateY(-50%);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:20px;line-height:1;color:var(--ink);background:var(--cardSolid);border:2.5px solid var(--paperEdge);box-shadow:0 3px 0 var(--paperShadow),0 0 0 6px var(--mapGround,var(--grass));z-index:2;cursor:pointer;padding:0 0 2px}
+.chipNav.next{right:-8px}.chipNav.prev{left:-8px}
+.chipNav:active{transform:translateY(calc(-50% + 2px))}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -291,7 +295,7 @@ body{background:var(--grass)}
       <button class="round" id="tagBtn" aria-label="가게 이름 보기 전환" title="가게 이름 보기">🏷️</button>
     </div>
     <label class="search"><span aria-hidden="true">🔍</span><input id="q" type="search" placeholder="가게 이름이나 메뉴 검색 (예: 텐동, 국밥)" autocomplete="off"></label>
-    <div class="chips" id="chips" role="toolbar" aria-label="카테고리"></div>
+    <div class="chipWrap"><div class="chips" id="chips" role="toolbar" aria-label="카테고리"></div><button class="chipNav prev" id="chipPrev" aria-label="이전 메뉴 보기" hidden>‹</button><button class="chipNav next" id="chipNext" aria-label="다음 메뉴 보기" hidden>›</button></div>
   </div>
   <div class="routeBar" id="routeBar" hidden></div>
   <div class="fab" id="fab">
@@ -540,6 +544,17 @@ function fitRoute(P){
   view.s=s; view.tx=r.width/2-(minX+maxX)/2*s; view.ty=top+(r.height-top-bottom)/2-(minY+maxY)/2*s; apply();
   setTimeout(()=>layer.style.transition='',520);
 }
+
+/* ================= CHIP ROW ARROWS ================= */
+(()=>{ const row=$('#chips'), prev=$('#chipPrev'), next=$('#chipNext');
+  const upd=()=>{ const max=row.scrollWidth-row.clientWidth; prev.hidden=row.scrollLeft<=4; next.hidden=row.scrollLeft>=max-4; };
+  row.addEventListener('scroll',upd,{passive:true}); addEventListener('resize',upd);
+  new MutationObserver(upd).observe(row,{childList:true}); setTimeout(upd,50); if(document.fonts) document.fonts.ready.then(upd);
+  next.onclick=()=>row.scrollBy({left:row.clientWidth*.7,behavior:'smooth'});
+  prev.onclick=()=>row.scrollBy({left:-row.clientWidth*.7,behavior:'smooth'});
+  // PC: 마우스 휠을 위아래로 굴려도 옆으로 넘어가게
+  row.addEventListener('wheel',e=>{ if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){ row.scrollLeft+=e.deltaY; e.preventDefault(); } },{passive:false});
+})();
 
 /* ================= TABS ================= */
 function setTab(t){
