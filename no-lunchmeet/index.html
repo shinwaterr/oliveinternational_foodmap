@@ -278,12 +278,21 @@ body{background:var(--grass)}
 .slot{background:linear-gradient(160deg,#fff4dc,#ffe9e4);border:3px solid var(--paperEdge);box-shadow:0 6px 0 var(--paperShadow)}
 .spinBtn{background:var(--mint);box-shadow:0 5px 0 #3f8f48}
 .ghost{border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow)}
+#tiles{position:absolute;left:0;top:0;pointer-events:none}
+#tiles img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;filter:sepia(.28) saturate(.85) hue-rotate(-6deg) brightness(1.03);image-rendering:auto}
+#map.real{background:#f1ead8}
+#map.real #roads{display:none}
+.mapToggle{position:absolute;left:max(14px,env(safe-area-inset-left,0px));z-index:26;display:flex;align-items:center;gap:6px;height:42px;padding:0 14px 0 11px;border-radius:99px;font-family:var(--display);font-size:14px;color:var(--ink);background:var(--cardSolid);border:2.5px solid var(--paperEdge);box-shadow:0 4px 0 var(--paperShadow);cursor:pointer}
+.mapToggle .i{font-size:17px}
+.mapToggle[aria-pressed="true"]{background:var(--mint);color:#fff;border-color:rgba(0,0,0,.1);box-shadow:0 4px 0 #3f8f48}
+.mapToggle:active{transform:translateY(3px);box-shadow:0 1px 0 var(--paperShadow)}
+.osmCredit{position:absolute;right:max(6px,env(safe-area-inset-right,0px));z-index:26;font-size:10.5px;color:#5b4a35;background:rgba(255,250,240,.85);padding:2px 6px;border-radius:6px;text-decoration:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
 <div class="app" id="app">
   <!-- MAP TAB -->
-  <div id="map"><div id="layer"><svg id="roads"></svg><svg id="routeSvg" width="1" height="1"></svg></div></div>
+  <div id="map"><div id="layer"><div id="tiles"></div><svg id="roads"></svg><svg id="routeSvg" width="1" height="1"></svg></div></div>
   <div class="top" id="mapTop">
     <div class="hdr">
       <div class="title">올리브인터내셔널 맛지도</div>
@@ -294,6 +303,8 @@ body{background:var(--grass)}
     <div class="chips" id="chips" role="toolbar" aria-label="카테고리"></div>
   </div>
   <div class="routeBar" id="routeBar" hidden></div>
+  <button class="mapToggle" id="mapToggle" aria-pressed="false" title="실제 지도 보기"><span class="i">🗺️</span><span id="mapToggleTxt">지도</span></button>
+  <a class="osmCredit" id="osmCredit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" hidden>© OpenStreetMap</a>
   <div class="fab" id="fab">
     <button class="round" id="zin" aria-label="확대">＋</button>
     <button class="round" id="zout" aria-label="축소">－</button>
@@ -421,6 +432,7 @@ function buildPins(){
   hq.addEventListener('click',e=>{e.stopPropagation(); goHome();}); layer.appendChild(hq);
 }
 function apply(){
+  if(realMap) scheduleTiles();
   layer.style.transform=`translate(${view.tx}px,${view.ty}px) scale(${view.s})`;
   const inv=1/view.s;
   layer.querySelectorAll('.pin').forEach(p=>{p.style.transform=`translate(-50%,-100%) scale(${inv})`;p.style.transformOrigin='50% 100%'});
@@ -495,7 +507,7 @@ let scrollT; $('#cards').addEventListener('scroll',()=>{ clearTimeout(scrollT); 
   if(bi!==curIdx){ curIdx=bi; updateNav(); const id=curList[bi].id; state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id)); cs.forEach(c=>c.classList.toggle('on',+c.dataset.id===id)); }
 },140); },{passive:true});
 document.addEventListener('keydown',e=>{ if(state.tab!=='map'||e.target.matches('input')) return; if(e.key==='ArrowRight') goCard(curIdx+1); if(e.key==='ArrowLeft') goCard(curIdx-1); });
-function placeFab(){$('#fab').style.bottom=($('.sheet').offsetHeight+12)+'px';}
+function placeFab(){$('#fab').style.bottom=($('.sheet').offsetHeight+12)+'px'; $('#mapToggle').style.top=($('#mapTop').hidden?($('#routeBar').offsetHeight+18):($('#mapTop').offsetHeight+6))+'px'; $('#osmCredit').style.bottom=($('.sheet').offsetHeight+4)+'px';}
 function select(id,go){
   state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id));
   document.querySelectorAll('.card').forEach(c=>c.classList.toggle('on',+c.dataset.id===id));
@@ -540,12 +552,56 @@ function fitRoute(P){
   setTimeout(()=>layer.style.transition='',520);
 }
 
+/* ================= REAL MAP (OpenStreetMap tiles) ================= */
+let realMap=false, tileRaf=0, tileZ=null; const TILES=new Map(); const tilesEl=$('#tiles');
+const lon2t=(lon,z)=>(lon+180)/360*2**z;
+const lat2t=(lat,z)=>{const r=lat*Math.PI/180; return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z;};
+const t2lon=(x,z)=>x/2**z*360-180;
+const t2lat=(y,z)=>{const n=Math.PI-2*Math.PI*y/2**z; return 180/Math.PI*Math.atan(.5*(Math.exp(n)-Math.exp(-n)));};
+function scheduleTiles(){ if(!tileRaf) tileRaf=requestAnimationFrame(()=>{tileRaf=0; renderTiles();}); }
+function renderTiles(){
+  const r=mapEl.getBoundingClientRect(); if(!r.width) return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const mpp0=156543.03*Math.cos(HQ.lat*Math.PI/180);           // 0레벨 1픽셀당 미터
+  const z=Math.max(13,Math.min(19,Math.round(Math.log2(view.s*dpr*mpp0)))); // 화면 1px≈타일 1px
+  // 화면 모서리 → 미터 → 위경도 → 타일 번호
+  const mx0=(0-view.tx)/view.s, mx1=(r.width-view.tx)/view.s, my0=(0-view.ty)/view.s, my1=(r.height-view.ty)/view.s;
+  const lonA=HQ.lon+mx0/M_LON, lonB=HQ.lon+mx1/M_LON, latA=HQ.lat-my0/M_LAT, latB=HQ.lat-my1/M_LAT;
+  const x0=Math.floor(lon2t(lonA,z)), x1=Math.floor(lon2t(lonB,z)), y0=Math.floor(lat2t(latA,z)), y1=Math.floor(lat2t(latB,z));
+  if((x1-x0+1)*(y1-y0+1)>120) return;
+  const want=new Set();
+  for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){
+    const k=`${z}/${x}/${y}`; want.add(k); if(TILES.has(k)) continue;
+    const L=xy(t2lat(y,z),t2lon(x,z)), Rb=xy(t2lat(y+1,z),t2lon(x+1,z));
+    const img=new Image(); img.alt=''; img.decoding='async'; img.draggable=false;
+    img.style.left=L.x+'px'; img.style.top=L.y+'px'; img.style.width=(Rb.x-L.x+.6)+'px'; img.style.height=(Rb.y-L.y+.6)+'px';
+    img.onload=()=>{ img.dataset.ok=1; if(z===tileZ) cleanTiles(); };
+    img.onerror=()=>{ img.remove(); TILES.delete(k); };
+    img.src=`https://tile.openstreetmap.org/${z}/${x}/${y}.png`; img.dataset.z=z;
+    tilesEl.appendChild(img); TILES.set(k,img);
+  }
+  tileZ=z; cleanTiles(want);
+}
+function cleanTiles(want){ // 다른 확대 단계 타일은 새 타일이 다 뜬 뒤 지움
+  const cur=[...TILES.entries()].filter(([k,i])=>+i.dataset.z===tileZ);
+  const ready=cur.every(([k,i])=>i.dataset.ok);
+  for(const [k,img] of TILES){ if(+img.dataset.z!==tileZ && ready){ img.remove(); TILES.delete(k);} }
+  if(TILES.size>400){ for(const [k,img] of TILES){ if(+img.dataset.z===tileZ && want && !want.has(k)){ img.remove(); TILES.delete(k);} } }
+}
+function setRealMap(on){
+  realMap=on; mapEl.classList.toggle('real',on); $('#mapToggle').setAttribute('aria-pressed',on);
+  $('#mapToggleTxt').textContent=on?'그림지도':'지도'; $('#mapToggle').title=on?'그림 지도로 돌아가기':'실제 지도 보기';
+  $('#osmCredit').hidden=!on||state.tab!=='map';
+  if(on) renderTiles(); else { tilesEl.innerHTML=''; TILES.clear(); tileZ=null; }
+}
+$('#mapToggle').onclick=()=>setRealMap(!realMap);
+
 /* ================= TABS ================= */
 function setTab(t){
   state.tab=t;
   document.querySelectorAll('.bbtn').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   const isMap=t==='map';
-  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
+  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#mapToggle').hidden=!isMap; $('#osmCredit').hidden=!isMap||!realMap; $('#cards').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
   $('#pickPanel').hidden=t!=='pick'; $('#meetPanel').hidden=t!=='meet';
   if(isMap) placeFab();
   if(t==='meet') meetInit();
@@ -619,7 +675,7 @@ let renderSeq=0;
 async function renderMeet(){
   const seq=++renderSeq; const box=$('#meetBody');
   if(!meet.ready){ box.innerHTML=`<div class="box"><div class="msg">신청 현황을 불러오는 중이에요…</div></div>`; return; }
-  if(meet.err==='offline'){ box.innerHTML=`<div class="notice">런치밋 신청은 슬랙에서 할 수 있어요. 아무 채널이나 DM 창에 <b>/lunchmeet</b> 을 입력해 신청하고, 조 편성 결과도 슬랙으로 받아보세요.</div>`; return; }
+  if(meet.err==='offline'){ box.innerHTML=`<div class="notice">이 화면에서는 신청 기능을 쓸 수 없어요. claude.ai에 로그인한 상태로 이 페이지를 열면 신청하고 함께 참여한 동료를 볼 수 있어요.</div>`; return; }
   const r=currentRound(); const list=meet.signups.filter(s=>s.round===r);
   const mine=list.find(s=>s.id===meet.uid); const res=meet.rounds['r-'+r];
   const ps=await resolveNames([...new Set([...list.map(s=>s.id), ...(res?res.groups.flatMap(g=>g.members):[])])]);
