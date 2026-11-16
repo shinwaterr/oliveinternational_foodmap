@@ -282,6 +282,25 @@ body{background:var(--grass)}
 .chipNav{position:absolute;top:calc(50% - 4px);transform:translateY(-50%);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:20px;line-height:1;color:var(--ink);background:var(--cardSolid);border:2.5px solid var(--paperEdge);box-shadow:0 3px 0 var(--paperShadow),0 0 0 6px var(--mapGround,var(--grass));z-index:2;cursor:pointer;padding:0 0 2px}
 .chipNav.next{right:-8px}.chipNav.prev{left:-8px}
 .chipNav:active{transform:translateY(calc(-50% + 2px))}
+/* ===== PC 화면 (가로 900px 이상): 왼쪽 사이드바 + 오른쪽 큰 지도 ===== */
+@media (min-width: 900px){
+  .app{max-width:none;--side:400px}
+  .app::before{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--side);z-index:29;background:var(--grass);border-right:3px solid var(--paperEdge);box-shadow:4px 0 18px rgba(60,80,40,.12)}
+  #map{left:var(--side)}
+  .top{right:auto;width:var(--side);background:none;padding:calc(18px + env(safe-area-inset-top,0px)) 18px 6px max(18px,env(safe-area-inset-left,0px));padding-bottom:6px!important}
+  .title{font-size:20px;white-space:nowrap}
+  .chips{flex-wrap:wrap;overflow:visible;margin:0;padding:2px 0 4px}
+  .chipNav{display:none!important}
+  .sheet{right:auto;width:var(--side);display:flex;flex-direction:column;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .carousel{flex:1;min-height:0;display:flex;flex-direction:column}
+  .cards{flex:1;min-height:0;flex-direction:column;overflow-x:hidden;overflow-y:auto;scroll-snap-type:none;padding:6px 18px 14px!important;gap:12px;scrollbar-width:thin}
+  .cards .card,.cards:not(.solo) .card{width:auto!important;flex:none;scroll-snap-align:none}
+  .cards.solo{justify-content:flex-start}
+  .cnav{display:none!important}
+  .bar{margin:auto 18px 0;flex:none}
+  .panel{right:auto;width:var(--side);z-index:35;padding-left:18px;padding-right:18px;padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+  .fab{right:24px}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -385,6 +404,7 @@ DATA.forEach(d=>{ const p=xy(d.lat,d.lon); d.x=p.x; d.y=p.y; d.dist=Math.hypot(p
 const BYID = Object.fromEntries(DATA.map(d=>[d.id,d]));
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DESK=matchMedia('(min-width: 900px)'); const isDesk=()=>DESK.matches;
 const mapEl=$('#map'), layer=$('#layer'), roads=$('#roads'), routeSvg=$('#routeSvg');
 let view={s:1.25,tx:0,ty:0};
 let state={tab:'map', cat:null, q:'', sel:null, tags:true}; let curIdx=0, curList=[];
@@ -493,14 +513,23 @@ function goCard(i){
 }
 $('#prevCard').onclick=()=>goCard(curIdx-1);
 $('#nextCard').onclick=()=>goCard(curIdx+1);
-let scrollT; $('#cards').addEventListener('scroll',()=>{ clearTimeout(scrollT); scrollT=setTimeout(()=>{
+let scrollT; $('#cards').addEventListener('scroll',()=>{ if(isDesk()) return; clearTimeout(scrollT); scrollT=setTimeout(()=>{
   const cs=[...$('#cards').querySelectorAll('.card[data-id]')]; if(!cs.length) return;
   const mid=$('#cards').getBoundingClientRect().left+$('#cards').clientWidth/2;
   let bi=0,bd=1e9; cs.forEach((c,i)=>{const r=c.getBoundingClientRect(); const dd=Math.abs(r.left+r.width/2-mid); if(dd<bd){bd=dd;bi=i;}});
   if(bi!==curIdx){ curIdx=bi; updateNav(); const id=curList[bi].id; state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id)); cs.forEach(c=>c.classList.toggle('on',+c.dataset.id===id)); }
 },140); },{passive:true});
 document.addEventListener('keydown',e=>{ if(state.tab!=='map'||e.target.matches('input')) return; if(e.key==='ArrowRight') goCard(curIdx+1); if(e.key==='ArrowLeft') goCard(curIdx-1); });
-function placeFab(){$('#fab').style.bottom=($('.sheet').offsetHeight+12)+'px';}
+function placeFab(){
+  const sheet=$('.sheet');
+  if(isDesk()){ // PC: 왼쪽 사이드바 = 상단 메뉴 + 맛집 목록 + 탭
+    sheet.style.top=($('#mapTop').hidden?0:$('#mapTop').offsetHeight)+'px';
+    $('#fab').style.bottom='24px';
+  } else {
+    sheet.style.top='';
+    $('#fab').style.bottom=(sheet.offsetHeight+12)+'px';
+  }
+}
 function select(id,go){
   state.sel=id; DATA.forEach(d=>pins[d.id].classList.toggle('on',id===d.id));
   document.querySelectorAll('.card').forEach(c=>c.classList.toggle('on',+c.dataset.id===id));
@@ -537,7 +566,7 @@ function showRoute(id){
 function clearRoute(){ routeId=null; routeSvg.innerHTML=''; $('#routeBar').hidden=true; if(state.tab==='map') $('#mapTop').hidden=false; }
 function fitPoints(P){ fitRoute(P); }
 function fitRoute(P){
-  const r=mapEl.getBoundingClientRect(); const top=($('#routeBar').hidden?$('#mapTop').offsetHeight:$('#routeBar').offsetHeight)+30, bottom=$('.sheet').offsetHeight+30, side=50;
+  const r=mapEl.getBoundingClientRect(); const desk=isDesk(); const top=desk?40:($('#routeBar').hidden?$('#mapTop').offsetHeight:$('#routeBar').offsetHeight)+30, bottom=desk?40:$('.sheet').offsetHeight+30, side=desk?80:50;
   const xs=P.map(p=>p.x), ys=P.map(p=>p.y); const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
   const s=Math.min(2.2,Math.max(0.45,Math.min((r.width-side*2)/Math.max(60,maxX-minX),(r.height-top-bottom)/Math.max(60,maxY-minY))));
   layer.style.transition='transform .5s cubic-bezier(.3,1.2,.5,1)';
@@ -561,9 +590,9 @@ function setTab(t){
   state.tab=t;
   document.querySelectorAll('.bbtn').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   const isMap=t==='map';
-  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
+  $('#mapTop').hidden=!isMap||routeId!=null; $('#routeBar').hidden=!isMap||routeId==null; $('#fab').hidden=!isMap; $('#cards').hidden=!isMap; $('#carousel').hidden=!isMap; $('#cnav').hidden=!isMap||curList.length<1;
   $('#pickPanel').hidden=t!=='pick'; $('#meetPanel').hidden=t!=='meet';
-  if(isMap) placeFab();
+  placeFab();
   if(t==='meet') meetInit();
 }
 document.querySelectorAll('.bbtn').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
@@ -736,6 +765,8 @@ setTab('map'); centerOn(0,0,1.25);
 requestAnimationFrame(()=>centerOn(0,0,1.25));
 addEventListener('load',()=>{ if(routeId==null && state.sel==null) centerOn(0,0,1.25); });
 addEventListener('resize',placeFab);
+DESK.addEventListener('change',()=>{ placeFab(); requestAnimationFrame(()=>{ if(state.sel==null) centerOn(0,0,1.25); else select(state.sel,true); }); });
+requestAnimationFrame(placeFab);
 </script>
 
 </body>
